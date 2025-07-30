@@ -122,6 +122,7 @@ export default function Home() {
 
   const onUpdateSpendCap = (data: { accessToken: string; adAccountId: string; spendCap: number }) => {
     setError(null);
+    console.log("Submitting spend cap update:", data);
     updateSpendCapMutation.mutate(data);
   };
 
@@ -312,7 +313,9 @@ export default function Home() {
                               className="pl-8"
                               onChange={(e) => {
                                 const dollarValue = parseFloat(e.target.value) || 0;
-                                field.onChange(Math.round(dollarValue * 100)); // Convert dollars to cents
+                                const centsValue = Math.round(dollarValue * 100);
+                                console.log("Input change:", { inputValue: e.target.value, dollarValue, centsValue });
+                                field.onChange(centsValue); // Convert dollars to cents
                               }}
                               value={field.value ? (field.value / 100).toFixed(2) : ""}
                             />
