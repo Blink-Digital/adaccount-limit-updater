@@ -4,9 +4,13 @@
 
 This is a full-stack web application built for managing Facebook ad accounts, specifically for viewing and updating spending caps. The application features a React frontend with shadcn/ui components and an Express.js backend that interfaces with the Facebook Graph API.
 
+**Current Status**: Fully functional interface with proper spend cap conversion handling. Users can fetch account details and update spend caps with correct dollar-to-API value conversion.
+
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+- **Communication style**: Simple, everyday language
+- **Default Ad Account**: act_1003491274360037 (configured as default in forms)
+- **Currency handling**: Fixed conversion logic - Facebook API expects dollar values, not cents
 
 ## System Architecture
 
@@ -105,5 +109,12 @@ The application follows a modern full-stack architecture with clear separation b
 - **Error Handling**: Structured error responses
 - **CORS**: Configured for cross-origin requests
 - **Token Security**: Client-side token handling (needs server-side improvement)
+
+## Recent Changes
+
+- **January 30, 2025**: Fixed critical spend cap conversion bug - Facebook API expects dollar values, not cents
+- **January 30, 2025**: Updated default ad account ID to act_1003491274360037 per user preference
+- **January 30, 2025**: Added comprehensive debugging for API value tracking
+- **January 30, 2025**: Verified successful spend cap updates with correct dollar amounts
 
 The application is designed for easy development in Replit while maintaining production-ready architecture patterns. The modular structure allows for easy extension of Facebook API features and database operations.
