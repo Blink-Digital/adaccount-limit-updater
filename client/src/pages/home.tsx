@@ -310,8 +310,11 @@ export default function Home() {
                               min="0"
                               step="0.01"
                               className="pl-8"
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) * 100)} // Convert to cents
-                              value={field.value ? (field.value / 100).toString() : ""}
+                              onChange={(e) => {
+                                const dollarValue = parseFloat(e.target.value) || 0;
+                                field.onChange(Math.round(dollarValue * 100)); // Convert dollars to cents
+                              }}
+                              value={field.value ? (field.value / 100).toFixed(2) : ""}
                             />
                           </div>
                         </FormControl>
