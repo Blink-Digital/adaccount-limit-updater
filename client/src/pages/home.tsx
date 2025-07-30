@@ -51,7 +51,7 @@ export default function Home() {
     resolver: zodResolver(fetchAccountRequestSchema),
     defaultValues: {
       accessToken: "",
-      adAccountId: "act_505640868528982"
+      adAccountId: "act_1003491274360037"
     }
   });
 
@@ -60,7 +60,7 @@ export default function Home() {
     resolver: zodResolver(updateSpendCapRequestSchema),
     defaultValues: {
       accessToken: "",
-      adAccountId: "act_505640868528982",
+      adAccountId: "act_1003491274360037",
       spendCap: 0.00
     }
   });
@@ -223,7 +223,7 @@ export default function Home() {
                           Ad Account ID <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="act_505640868528982" />
+                          <Input {...field} placeholder="act_1003491274360037" />
                         </FormControl>
                         <p className="text-xs text-gray-500">
                           Enter the ad account ID (including 'act_' prefix)
