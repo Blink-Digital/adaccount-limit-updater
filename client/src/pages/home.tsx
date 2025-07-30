@@ -61,7 +61,7 @@ export default function Home() {
     defaultValues: {
       accessToken: "",
       adAccountId: "act_505640868528982",
-      spendCap: 0
+      spendCap: 0.00
     }
   });
 
@@ -146,7 +146,7 @@ export default function Home() {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2
-    }).format(amount / 100); // Facebook stores amounts in cents
+    }).format(amount / 100); // Facebook returns amounts in cents but API expects dollars for updates
   };
 
   return (
@@ -313,11 +313,10 @@ export default function Home() {
                               className="pl-8"
                               onChange={(e) => {
                                 const dollarValue = parseFloat(e.target.value) || 0;
-                                const centsValue = Math.round(dollarValue * 100);
-                                console.log("Input change:", { inputValue: e.target.value, dollarValue, centsValue });
-                                field.onChange(centsValue); // Convert dollars to cents
+                                console.log("Input change:", { inputValue: e.target.value, dollarValue });
+                                field.onChange(dollarValue); // Store as dollars since API expects dollars
                               }}
-                              value={field.value ? (field.value / 100).toFixed(2) : ""}
+                              value={field.value ? field.value.toString() : ""}
                             />
                           </div>
                         </FormControl>

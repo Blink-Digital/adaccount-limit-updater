@@ -54,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { accessToken, adAccountId, spendCap } = updateSpendCapRequestSchema.parse(req.body);
       
       // Debug logging
-      console.log("Received spend cap update request:", { adAccountId, spendCap });
+      console.log("Received spend cap update request:", { adAccountId, spendCap, type: typeof spendCap });
       
       const url = `https://graph.facebook.com/${adAccountId}`;
       
