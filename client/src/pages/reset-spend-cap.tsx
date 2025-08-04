@@ -48,6 +48,8 @@ export default function ResetSpendCap() {
   const [showToken, setShowToken] = useState(false);
   const [accessToken, setAccessToken] = useState("");
   const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const accountsPerPage = 20;
   const { toast } = useToast();
 
   // Form for fetching inactive accounts
@@ -99,6 +101,7 @@ export default function ResetSpendCap() {
 
   const onSubmit = (data: { accessToken: string }) => {
     setAccessToken(data.accessToken);
+    setCurrentPage(1); // Reset to first page when fetching new data
   };
 
   const handleResetSpendCap = (accountId: string) => {
@@ -111,6 +114,25 @@ export default function ResetSpendCap() {
       currency: currency,
       minimumFractionDigits: 2
     }).format(amount / 100); // Facebook returns amounts in cents
+  };
+
+  // Calculate pagination
+  const totalAccounts = inactiveAccounts?.data?.length || 0;
+  const totalPages = Math.ceil(totalAccounts / accountsPerPage);
+  const startIndex = (currentPage - 1) * accountsPerPage;
+  const endIndex = startIndex + accountsPerPage;
+  const currentAccounts = inactiveAccounts?.data?.slice(startIndex, endIndex) || [];
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages, prev + 1));
   };
 
   return (
@@ -251,8 +273,20 @@ export default function ResetSpendCap() {
                         <p className="text-gray-600">All your ad accounts had spending activity last month.</p>
                       </div>
                     ) : (
-                      <div className="grid gap-4">
-                        {inactiveAccounts.data.map((account: InactiveAccount) => (
+                      <>
+                        {/* Pagination Header */}
+                        <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+                          <div className="text-sm text-gray-700">
+                            Showing {startIndex + 1} to {Math.min(endIndex, totalAccounts)} of {totalAccounts} accounts
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Page {currentPage} of {totalPages}
+                          </div>
+                        </div>
+
+                        {/* Accounts Grid */}
+                        <div className="grid gap-4">
+                          {currentAccounts.map((account: InactiveAccount) => (
                           <div
                             key={account.id}
                             className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
@@ -313,8 +347,59 @@ export default function ResetSpendCap() {
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
+                            <Button
+                              onClick={goToPreviousPage}
+                              disabled={currentPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Previous
+                            </Button>
+                            
+                            <div className="flex items-center space-x-1">
+                              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                let pageNum;
+                                if (totalPages <= 5) {
+                                  pageNum = i + 1;
+                                } else if (currentPage <= 3) {
+                                  pageNum = i + 1;
+                                } else if (currentPage >= totalPages - 2) {
+                                  pageNum = totalPages - 4 + i;
+                                } else {
+                                  pageNum = currentPage - 2 + i;
+                                }
+                                
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    onClick={() => goToPage(pageNum)}
+                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    className="w-8 h-8 p-0"
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                            
+                            <Button
+                              onClick={goToNextPage}
+                              disabled={currentPage === totalPages}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
