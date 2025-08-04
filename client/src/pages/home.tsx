@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,8 @@ import {
   Loader2
 } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa";
+import { FacebookLoginButton } from "@/components/FacebookLoginButton";
+import { useFacebookAuth } from "@/hooks/useFacebookAuth";
 
 export default function Home() {
   const [showToken, setShowToken] = useState(false);
@@ -45,6 +47,7 @@ export default function Home() {
   const [lastResponse, setLastResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { getStoredToken } = useFacebookAuth();
 
   // Form for fetching account details
   const fetchForm = useForm({
@@ -64,6 +67,15 @@ export default function Home() {
       spendCap: 0.00
     }
   });
+
+  // Load stored Facebook token on component mount
+  useEffect(() => {
+    const storedToken = getStoredToken();
+    if (storedToken) {
+      fetchForm.setValue("accessToken", storedToken);
+      updateForm.setValue("accessToken", storedToken);
+    }
+  }, [getStoredToken, fetchForm, updateForm]);
 
   // Fetch account mutation
   const fetchAccountMutation = useMutation({
@@ -140,6 +152,11 @@ export default function Home() {
     setError(null);
   };
 
+  const handleFacebookLogin = (token: string) => {
+    fetchForm.setValue("accessToken", token);
+    updateForm.setValue("accessToken", token);
+  };
+
   const formatCurrency = (amount: number | null) => {
     if (amount === null) return "No limit";
     return new Intl.NumberFormat('en-US', {
@@ -188,22 +205,30 @@ export default function Home() {
                           Facebook Access Token <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <Input
-                              {...field}
-                              type={showToken ? "text" : "password"}
-                              placeholder="EAAYourAccessTokenHere..."
-                              className="pr-12 font-mono text-sm"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                              onClick={() => setShowToken(!showToken)}
-                            >
-                              {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
+                          <div className="space-y-2">
+                            <div className="relative">
+                              <Input
+                                {...field}
+                                type={showToken ? "text" : "password"}
+                                placeholder="EAAYourAccessTokenHere..."
+                                className="pr-12 font-mono text-sm"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                                onClick={() => setShowToken(!showToken)}
+                              >
+                                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <div className="flex justify-start">
+                              <FacebookLoginButton 
+                                onTokenReceived={handleFacebookLogin}
+                                disabled={fetchAccountMutation.isPending}
+                              />
+                            </div>
                           </div>
                         </FormControl>
                         <p className="text-xs text-gray-500">
