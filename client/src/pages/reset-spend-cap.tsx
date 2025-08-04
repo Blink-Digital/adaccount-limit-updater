@@ -47,6 +47,7 @@ interface InactiveAccount {
 export default function ResetSpendCap() {
   const [showToken, setShowToken] = useState(false);
   const [accessToken, setAccessToken] = useState("");
+  const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Form for fetching inactive accounts
@@ -71,6 +72,7 @@ export default function ResetSpendCap() {
   // Mutation to set spend cap to $1 for an account
   const resetSpendCapMutation = useMutation({
     mutationFn: async ({ accountId }: { accountId: string }) => {
+      setProcessingAccountId(accountId);
       const response = await apiRequest("POST", "/api/facebook/set-spend-cap-to-one", {
         accessToken,
         adAccountId: accountId
@@ -82,6 +84,7 @@ export default function ResetSpendCap() {
         title: "Success",
         description: "Spend cap set to $1 successfully"
       });
+      setProcessingAccountId(null);
       refetch(); // Refresh the list
     },
     onError: (error: any) => {
@@ -90,6 +93,7 @@ export default function ResetSpendCap() {
         description: error.message || "Failed to set spend cap to $1",
         variant: "destructive"
       });
+      setProcessingAccountId(null);
     }
   });
 
@@ -296,11 +300,11 @@ export default function ResetSpendCap() {
                               <div className="ml-4">
                                 <Button
                                   onClick={() => handleResetSpendCap(account.id)}
-                                  disabled={resetSpendCapMutation.isPending}
+                                  disabled={processingAccountId === account.id}
                                   variant="outline"
                                   className="border-green-300 text-green-600 hover:bg-green-50"
                                 >
-                                  {resetSpendCapMutation.isPending ? (
+                                  {processingAccountId === account.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     "Set to $1"
