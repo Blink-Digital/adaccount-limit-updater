@@ -68,10 +68,10 @@ export default function ResetSpendCap() {
     enabled: !!accessToken
   });
 
-  // Mutation to reset spend cap for an account
+  // Mutation to set spend cap to $1 for an account
   const resetSpendCapMutation = useMutation({
     mutationFn: async ({ accountId }: { accountId: string }) => {
-      const response = await apiRequest("POST", "/api/facebook/reset-spend-cap", {
+      const response = await apiRequest("POST", "/api/facebook/set-spend-cap-to-one", {
         accessToken,
         adAccountId: accountId
       });
@@ -80,14 +80,14 @@ export default function ResetSpendCap() {
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Spend cap removed successfully"
+        description: "Spend cap set to $1 successfully"
       });
       refetch(); // Refresh the list
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to reset spend cap",
+        description: error.message || "Failed to set spend cap to $1",
         variant: "destructive"
       });
     }
@@ -121,7 +121,7 @@ export default function ResetSpendCap() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Reset Spend Caps</h1>
-                <p className="text-sm text-gray-600">Find and reset spend caps for accounts with no spending last month</p>
+                <p className="text-sm text-gray-600">Set spend caps to $1 for accounts with no spending last month</p>
               </div>
             </div>
             <nav className="flex items-center space-x-4">
@@ -294,20 +294,18 @@ export default function ResetSpendCap() {
                                 </div>
                               </div>
                               <div className="ml-4">
-                                {account.spend_cap && (
-                                  <Button
-                                    onClick={() => handleResetSpendCap(account.id)}
-                                    disabled={resetSpendCapMutation.isPending}
-                                    variant="outline"
-                                    className="border-red-300 text-red-600 hover:bg-red-50"
-                                  >
-                                    {resetSpendCapMutation.isPending ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      "Remove Spend Cap"
-                                    )}
-                                  </Button>
-                                )}
+                                <Button
+                                  onClick={() => handleResetSpendCap(account.id)}
+                                  disabled={resetSpendCapMutation.isPending}
+                                  variant="outline"
+                                  className="border-green-300 text-green-600 hover:bg-green-50"
+                                >
+                                  {resetSpendCapMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Set to $1"
+                                  )}
+                                </Button>
                               </div>
                             </div>
                           </div>

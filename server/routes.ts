@@ -189,8 +189,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Reset spend cap (remove limit)
-  app.post("/api/facebook/reset-spend-cap", async (req, res) => {
+  // Set spend cap to $1
+  app.post("/api/facebook/set-spend-cap-to-one", async (req, res) => {
     try {
       const { accessToken, adAccountId } = resetSpendCapRequestSchema.parse(req.body);
       
@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         body: new URLSearchParams({
           access_token: accessToken,
-          spend_cap: '' // Empty value removes the spend cap
+          spend_cap: '1' // Set spend cap to $1
         })
       });
       
@@ -229,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: updatedData.name,
           spend_cap: updatedData.spend_cap
         },
-        message: "Spend cap removed successfully"
+        message: "Spend cap set to $1 successfully"
       };
       
       res.json(apiResponse);
