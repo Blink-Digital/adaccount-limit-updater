@@ -18,16 +18,23 @@ export const FacebookLoginButton = ({ onTokenReceived, disabled }: FacebookLogin
   const handleLogin = async () => {
     try {
       setIsAuthenticating(true);
+      
+      // Check if SDK is loaded
+      if (!isSDKLoaded) {
+        throw new Error("Facebook SDK is still loading, please wait a moment and try again");
+      }
+      
       const token = await login();
       onTokenReceived(token);
       toast({
-        title: "Success",
-        description: "Successfully logged in with Facebook"
+        title: "Success", 
+        description: "Successfully logged in with Facebook and retrieved access token"
       });
     } catch (err: any) {
+      console.error("Facebook login error:", err);
       toast({
         title: "Login Failed",
-        description: err.message || "Failed to login with Facebook",
+        description: err.message || "Failed to login with Facebook. Please check your popup blocker settings.",
         variant: "destructive"
       });
     } finally {
