@@ -79,6 +79,10 @@ export const useFacebookAuth = () => {
             const errorMsg = 'Please authorize the app to access your Facebook ads data';
             setError(errorMsg);
             reject(new Error(errorMsg));
+          } else if (response.status === 'unknown') {
+            const errorMsg = 'Facebook app configuration issue. Please enable JavaScript SDK in Facebook Developer Console and add this domain to allowed URLs.';
+            setError(errorMsg);
+            reject(new Error(errorMsg));
           } else {
             const errorMsg = 'Facebook login was cancelled or failed';
             setError(errorMsg);
