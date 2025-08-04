@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fetch inactive accounts (no spending last month)
   app.post("/api/facebook/inactive-accounts", async (req, res) => {
     try {
-      const { accessToken } = inactiveAccountsRequestSchema.parse(req.body);
+      const { accessToken, page = 1, limit = 20 } = inactiveAccountsRequestSchema.parse(req.body);
       
       // Get all ad accounts for the user
       const accountsUrl = `https://graph.facebook.com/me/adaccounts?fields=id,name,spend_cap,account_status,currency&access_token=${accessToken}`;
@@ -133,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const since = Math.floor(lastMonth.getTime() / 1000);
       const until = Math.floor(lastMonthEnd.getTime() / 1000);
 
-      const inactiveAccounts: InactiveAccount[] = [];
+      const allInactiveAccounts: InactiveAccount[] = [];
 
       // Check spending for each account
       for (const account of accountsData.data) {
@@ -150,7 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // If no spending last month, add to inactive list
           if (lastMonthSpend === 0) {
-            inactiveAccounts.push({
+            allInactiveAccounts.push({
               id: account.id,
               name: account.name,
               spend_cap: account.spend_cap,
@@ -162,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.warn(`Failed to get insights for account ${account.id}:`, error);
           // Include accounts where we can't get insights as potentially inactive
-          inactiveAccounts.push({
+          allInactiveAccounts.push({
             id: account.id,
             name: account.name,
             spend_cap: account.spend_cap,
@@ -173,10 +173,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Apply pagination
+      const totalItems = allInactiveAccounts.length;
+      const totalPages = Math.ceil(totalItems / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedAccounts = allInactiveAccounts.slice(startIndex, endIndex);
+
       const apiResponse: ApiResponse<InactiveAccount[]> = {
         success: true,
-        data: inactiveAccounts,
-        message: `Found ${inactiveAccounts.length} accounts with no spending last month`
+        data: paginatedAccounts,
+        message: `Found ${totalItems} accounts with no spending last month`,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems,
+          itemsPerPage: limit
+        }
       };
       
       res.json(apiResponse);

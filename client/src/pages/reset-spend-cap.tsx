@@ -60,12 +60,16 @@ export default function ResetSpendCap() {
     }
   });
 
-  // Query to fetch inactive accounts
+  // Query to fetch inactive accounts with pagination
   const { data: inactiveAccounts, isLoading, error, refetch } = useQuery({
-    queryKey: ['/api/facebook/inactive-accounts', accessToken],
+    queryKey: ['/api/facebook/inactive-accounts', accessToken, currentPage],
     queryFn: async () => {
       if (!accessToken) return null;
-      const response = await apiRequest("POST", "/api/facebook/inactive-accounts", { accessToken });
+      const response = await apiRequest("POST", "/api/facebook/inactive-accounts", { 
+        accessToken, 
+        page: currentPage, 
+        limit: accountsPerPage 
+      });
       return response.json();
     },
     enabled: !!accessToken
@@ -116,12 +120,11 @@ export default function ResetSpendCap() {
     }).format(amount / 100); // Facebook returns amounts in cents
   };
 
-  // Calculate pagination
-  const totalAccounts = inactiveAccounts?.data?.length || 0;
-  const totalPages = Math.ceil(totalAccounts / accountsPerPage);
-  const startIndex = (currentPage - 1) * accountsPerPage;
-  const endIndex = startIndex + accountsPerPage;
-  const currentAccounts = inactiveAccounts?.data?.slice(startIndex, endIndex) || [];
+  // Get pagination info from API response
+  const pagination = inactiveAccounts?.pagination;
+  const totalAccounts = pagination?.totalItems || 0;
+  const totalPages = pagination?.totalPages || 0;
+  const currentAccounts = inactiveAccounts?.data || [];
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
@@ -277,7 +280,7 @@ export default function ResetSpendCap() {
                         {/* Pagination Header */}
                         <div className="flex items-center justify-between border-b border-gray-200 pb-4">
                           <div className="text-sm text-gray-700">
-                            Showing {startIndex + 1} to {Math.min(endIndex, totalAccounts)} of {totalAccounts} accounts
+                            Showing {((currentPage - 1) * accountsPerPage) + 1} to {Math.min(currentPage * accountsPerPage, totalAccounts)} of {totalAccounts} accounts
                           </div>
                           <div className="text-sm text-gray-500">
                             Page {currentPage} of {totalPages}

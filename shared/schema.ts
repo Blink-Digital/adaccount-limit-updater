@@ -20,6 +20,8 @@ export const fetchAccountRequestSchema = z.object({
 
 export const inactiveAccountsRequestSchema = z.object({
   accessToken: z.string().min(1, "Access token is required"),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(20)
 });
 
 export const resetSpendCapRequestSchema = z.object({
@@ -48,4 +50,10 @@ export interface ApiResponse<T = any> {
   data?: T;
   message?: string;
   error?: string;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
 }
