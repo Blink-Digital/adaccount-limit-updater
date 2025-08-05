@@ -29,6 +29,23 @@ export const resetSpendCapRequestSchema = z.object({
   adAccountId: z.string().min(1, "Ad account ID is required"),
 });
 
+export const businessManagerRequestSchema = z.object({
+  accessToken: z.string().min(1, "Access token is required")
+});
+
+export const businessManagerAccountsRequestSchema = z.object({
+  accessToken: z.string().min(1, "Access token is required"),
+  businessId: z.string().min(1, "Business ID is required"),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(20)
+});
+
+export const businessManagerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  account_count: z.number().optional(),
+});
+
 export const inactiveAccountSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -44,6 +61,9 @@ export type FetchAccountRequest = z.infer<typeof fetchAccountRequestSchema>;
 export type InactiveAccountsRequest = z.infer<typeof inactiveAccountsRequestSchema>;
 export type ResetSpendCapRequest = z.infer<typeof resetSpendCapRequestSchema>;
 export type InactiveAccount = z.infer<typeof inactiveAccountSchema>;
+export type BusinessManagerRequest = z.infer<typeof businessManagerRequestSchema>;
+export type BusinessManagerAccountsRequest = z.infer<typeof businessManagerAccountsRequestSchema>;
+export type BusinessManager = z.infer<typeof businessManagerSchema>;
 
 export interface ApiResponse<T = any> {
   success: boolean;

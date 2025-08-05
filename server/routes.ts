@@ -6,9 +6,12 @@ import {
   fetchAccountRequestSchema,
   inactiveAccountsRequestSchema,
   resetSpendCapRequestSchema,
+  businessManagerRequestSchema,
+  businessManagerAccountsRequestSchema,
   type ApiResponse,
   type FacebookAccount,
-  type InactiveAccount
+  type InactiveAccount,
+  type BusinessManager
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -243,6 +246,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
           spend_cap: updatedData.spend_cap
         },
         message: "Spend cap set to $1 successfully"
+      };
+      
+      res.json(apiResponse);
+    } catch (error: any) {
+      const apiResponse: ApiResponse = {
+        success: false,
+        error: error.message || "Internal server error"
+      };
+      res.status(500).json(apiResponse);
+    }
+  });
+
+  // Fetch Business Managers that user has access to
+  app.post("/api/facebook/business-managers", async (req, res) => {
+    try {
+      const { accessToken } = businessManagerRequestSchema.parse(req.body);
+      
+      const url = `https://graph.facebook.com/me/businesses?fields=id,name&access_token=${accessToken}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const apiResponse: ApiResponse = {
+          success: false,
+          error: data.error?.message || "Failed to fetch business managers"
+        };
+        return res.status(400).json(apiResponse);
+      }
+      
+      const businessManagers: BusinessManager[] = data.data?.map((bm: any) => ({
+        id: bm.id,
+        name: bm.name
+      })) || [];
+      
+      const apiResponse: ApiResponse<BusinessManager[]> = {
+        success: true,
+        data: businessManagers,
+        message: "Business managers fetched successfully"
+      };
+      
+      res.json(apiResponse);
+    } catch (error: any) {
+      const apiResponse: ApiResponse = {
+        success: false,
+        error: error.message || "Internal server error"
+      };
+      res.status(500).json(apiResponse);
+    }
+  });
+
+  // Fetch ad accounts for a specific Business Manager with pagination
+  app.post("/api/facebook/business-manager-accounts", async (req, res) => {
+    try {
+      const { accessToken, businessId, page, limit } = businessManagerAccountsRequestSchema.parse(req.body);
+      
+      const offset = (page - 1) * limit;
+      const url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&limit=${limit}&offset=${offset}&access_token=${accessToken}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const apiResponse: ApiResponse = {
+          success: false,
+          error: data.error?.message || "Failed to fetch business manager accounts"
+        };
+        return res.status(400).json(apiResponse);
+      }
+      
+      const accounts = data.data || [];
+      const totalItems = data.paging?.total_count || accounts.length;
+      const totalPages = Math.ceil(totalItems / limit);
+      
+      const apiResponse: ApiResponse<FacebookAccount[]> = {
+        success: true,
+        data: accounts,
+        message: "Business manager accounts fetched successfully",
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems,
+          itemsPerPage: limit
+        }
       };
       
       res.json(apiResponse);
