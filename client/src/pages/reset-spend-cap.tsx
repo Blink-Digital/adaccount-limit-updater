@@ -29,7 +29,8 @@ import {
   DollarSign,
   Calendar,
   Eye,
-  EyeOff
+  EyeOff,
+  CheckCircle2
 } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa";
 import { FacebookLoginButton } from "../components/FacebookLoginButton";
@@ -48,6 +49,7 @@ export default function ResetSpendCap() {
   const [showToken, setShowToken] = useState(false);
   const [accessToken, setAccessToken] = useState("");
   const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
+  const [processedAccounts, setProcessedAccounts] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const accountsPerPage = 20;
   const { toast } = useToast();
@@ -90,12 +92,15 @@ export default function ResetSpendCap() {
       const account = currentAccounts.find((acc: InactiveAccount) => acc.id === variables.accountId);
       const currencyDisplay = account ? formatCurrencyForSetCap(account.currency) : '$1';
       
+      // Add account to processed accounts set
+      setProcessedAccounts(prev => new Set(prev).add(variables.accountId));
+      
       toast({
         title: "Success",
         description: `Spend cap set to ${currencyDisplay} successfully`
       });
       setProcessingAccountId(null);
-      refetch(); // Refresh the list
+      // Don't refetch - keep optimistic UI state
     },
     onError: (error: any) => {
       toast({
@@ -305,7 +310,11 @@ export default function ResetSpendCap() {
                           {currentAccounts.map((account: InactiveAccount) => (
                           <div
                             key={account.id}
-                            className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                            className={`border rounded-lg p-4 hover:bg-gray-50 ${
+                              processedAccounts.has(account.id) 
+                                ? 'border-green-300 bg-green-50' 
+                                : 'border-gray-200'
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -313,8 +322,13 @@ export default function ResetSpendCap() {
                                   <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
                                     <FaFacebookF className="text-gray-600 text-sm" />
                                   </div>
-                                  <div>
-                                    <h3 className="font-medium text-gray-900">{account.name}</h3>
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2">
+                                      <h3 className="font-medium text-gray-900">{account.name}</h3>
+                                      {processedAccounts.has(account.id) && (
+                                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                      )}
+                                    </div>
                                     <p className="text-sm text-gray-500">{account.id}</p>
                                   </div>
                                 </div>
@@ -322,10 +336,15 @@ export default function ResetSpendCap() {
                                   <div>
                                     <span className="text-gray-500">Current Spend Cap:</span>
                                     <div className="font-medium">
-                                      {account.spend_cap ? 
-                                        formatCurrency(account.spend_cap, account.currency) : 
-                                        "No limit"
-                                      }
+                                      {processedAccounts.has(account.id) ? (
+                                        <span className="text-green-600">
+                                          {formatCurrencyForSetCap(account.currency)}
+                                        </span>
+                                      ) : (
+                                        account.spend_cap ? 
+                                          formatCurrency(account.spend_cap, account.currency) : 
+                                          "No limit"
+                                      )}
                                     </div>
                                   </div>
                                   <div>
@@ -350,12 +369,21 @@ export default function ResetSpendCap() {
                               <div className="ml-4">
                                 <Button
                                   onClick={() => handleResetSpendCap(account.id)}
-                                  disabled={processingAccountId === account.id}
+                                  disabled={processingAccountId === account.id || processedAccounts.has(account.id)}
                                   variant="outline"
-                                  className="border-green-300 text-green-600 hover:bg-green-50"
+                                  className={`${
+                                    processedAccounts.has(account.id)
+                                      ? 'border-green-600 text-green-600 bg-green-100'
+                                      : 'border-green-300 text-green-600 hover:bg-green-50'
+                                  }`}
                                 >
                                   {processingAccountId === account.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : processedAccounts.has(account.id) ? (
+                                    <>
+                                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                                      Set to {formatCurrencyForSetCap(account.currency)}
+                                    </>
                                   ) : (
                                     `Set to ${formatCurrencyForSetCap(account.currency)}`
                                   )}
