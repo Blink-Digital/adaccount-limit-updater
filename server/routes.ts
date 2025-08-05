@@ -6,9 +6,12 @@ import {
   fetchAccountRequestSchema,
   inactiveAccountsRequestSchema,
   resetSpendCapRequestSchema,
+  businessManagerRequestSchema,
+  businessManagerAccountsRequestSchema,
   type ApiResponse,
   type FacebookAccount,
-  type InactiveAccount
+  type InactiveAccount,
+  type BusinessManager
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -243,6 +246,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
           spend_cap: updatedData.spend_cap
         },
         message: "Spend cap set to $1 successfully"
+      };
+      
+      res.json(apiResponse);
+    } catch (error: any) {
+      const apiResponse: ApiResponse = {
+        success: false,
+        error: error.message || "Internal server error"
+      };
+      res.status(500).json(apiResponse);
+    }
+  });
+
+  // Fetch Business Managers that user has access to
+  app.post("/api/facebook/business-managers", async (req, res) => {
+    try {
+      const { accessToken } = businessManagerRequestSchema.parse(req.body);
+      
+      const url = `https://graph.facebook.com/me/businesses?fields=id,name&access_token=${accessToken}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const apiResponse: ApiResponse = {
+          success: false,
+          error: data.error?.message || "Failed to fetch business managers"
+        };
+        return res.status(400).json(apiResponse);
+      }
+      
+      const businessManagers: BusinessManager[] = data.data?.map((bm: any) => ({
+        id: bm.id,
+        name: bm.name
+      })) || [];
+      
+      const apiResponse: ApiResponse<BusinessManager[]> = {
+        success: true,
+        data: businessManagers,
+        message: "Business managers fetched successfully"
+      };
+      
+      res.json(apiResponse);
+    } catch (error: any) {
+      const apiResponse: ApiResponse = {
+        success: false,
+        error: error.message || "Internal server error"
+      };
+      res.status(500).json(apiResponse);
+    }
+  });
+
+  // Fetch ad accounts for a specific Business Manager with pagination and spending data  
+  app.post("/api/facebook/business-manager-accounts", async (req, res) => {
+    try {
+      const { accessToken, businessId, page, limit } = businessManagerAccountsRequestSchema.parse(req.body);
+      
+      const offset = (page - 1) * limit;
+      const url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&limit=${limit}&offset=${offset}&access_token=${accessToken}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const apiResponse: ApiResponse = {
+          success: false,
+          error: data.error?.message || "Failed to fetch business manager accounts"
+        };
+        return res.status(400).json(apiResponse);
+      }
+      
+      const accounts = data.data || [];
+      
+      // Get last month's date range
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = lastMonth.toISOString().split('T')[0];
+      const lastMonthEnd = new Date(thisMonth.getTime() - 1).toISOString().split('T')[0];
+      
+      // Enrich accounts with spending data
+      const enrichedAccounts = [];
+      for (const account of accounts) {
+        try {
+          // Get insights for last month
+          const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={"since":"${lastMonthStart}","until":"${lastMonthEnd}"}&access_token=${accessToken}`;
+          const insightsResponse = await fetch(insightsUrl);
+          const insightsData = await insightsResponse.json();
+          
+          let lastMonthSpend = 0;
+          if (insightsData.data && insightsData.data.length > 0) {
+            lastMonthSpend = parseFloat(insightsData.data[0].spend || '0');
+          }
+          
+          enrichedAccounts.push({
+            id: account.id,
+            name: account.name,
+            spend_cap: account.spend_cap,
+            last_month_spend: lastMonthSpend,
+            currency: account.currency || 'USD',
+            account_status: account.account_status
+          });
+        } catch (error) {
+          console.warn(`Failed to get insights for account ${account.id}:`, error);
+          // Include accounts where we can't get insights with 0 spend
+          enrichedAccounts.push({
+            id: account.id,
+            name: account.name,
+            spend_cap: account.spend_cap,
+            last_month_spend: 0,
+            currency: account.currency || 'USD',
+            account_status: account.account_status
+          });
+        }
+      }
+      
+      const totalItems = data.paging?.total_count || enrichedAccounts.length;
+      const totalPages = Math.ceil(totalItems / limit);
+      
+      const apiResponse: ApiResponse<any[]> = {
+        success: true,
+        data: enrichedAccounts,
+        message: "Business manager accounts fetched successfully with spending data",
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems,
+          itemsPerPage: limit
+        }
       };
       
       res.json(apiResponse);

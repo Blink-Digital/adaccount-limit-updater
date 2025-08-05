@@ -10,6 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
   Form, 
   FormControl, 
   FormField, 
@@ -20,8 +27,11 @@ import {
 import { 
   updateSpendCapRequestSchema, 
   fetchAccountRequestSchema,
+  businessManagerRequestSchema,
+  businessManagerAccountsRequestSchema,
   type FacebookAccount,
-  type ApiResponse 
+  type ApiResponse,
+  type BusinessManager
 } from "@shared/schema";
 import { 
   Key, 
@@ -46,6 +56,9 @@ export default function Home() {
   const [currentAccount, setCurrentAccount] = useState<FacebookAccount | null>(null);
   const [lastResponse, setLastResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
+  const [accounts, setAccounts] = useState<FacebookAccount[]>([]);
   const { toast } = useToast();
 
   // Form for fetching account details
@@ -67,12 +80,45 @@ export default function Home() {
     }
   });
 
+  // Function to fetch business managers
+  const fetchBusinessManagers = async (token: string) => {
+    try {
+      const response = await apiRequest("POST", "/api/facebook/business-managers", { accessToken: token });
+      const data = await response.json();
+      if (data.success && data.data) {
+        setBusinessManagers(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch business managers:", error);
+    }
+  };
+
+  // Function to fetch accounts for selected business manager
+  const fetchBusinessAccounts = async (businessId: string, token: string) => {
+    try {
+      const response = await apiRequest("POST", "/api/facebook/business-manager-accounts", { 
+        accessToken: token, 
+        businessId,
+        page: 1,
+        limit: 50
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        setAccounts(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch business accounts:", error);
+    }
+  };
+
   // Load stored Facebook token on component mount
   useEffect(() => {
     const storedToken = sessionStorage.getItem('facebook_access_token');
     if (storedToken) {
       fetchForm.setValue("accessToken", storedToken);
       updateForm.setValue("accessToken", storedToken);
+      // Auto-fetch business managers when token is available
+      fetchBusinessManagers(storedToken);
     }
   }, [fetchForm, updateForm]);
 
@@ -154,6 +200,16 @@ export default function Home() {
   const handleFacebookLogin = (token: string) => {
     fetchForm.setValue("accessToken", token);
     updateForm.setValue("accessToken", token);
+    // Fetch business managers when new token is received
+    fetchBusinessManagers(token);
+  };
+
+  const handleBusinessManagerChange = (businessId: string) => {
+    setSelectedBusinessId(businessId);
+    const token = fetchForm.getValues("accessToken");
+    if (token && businessId) {
+      fetchBusinessAccounts(businessId, token);
+    }
   };
 
   const formatCurrency = (amount: number | null) => {
@@ -243,6 +299,59 @@ export default function Home() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Business Manager Selection */}
+                  {businessManagers.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Business Manager</Label>
+                      <Select 
+                        value={selectedBusinessId} 
+                        onValueChange={handleBusinessManagerChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Business Manager" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {businessManagers.map((bm) => (
+                            <SelectItem key={bm.id} value={bm.id}>
+                              {bm.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Choose which Business Manager to view accounts from
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Ad Account Selection */}
+                  {accounts.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Ad Account</Label>
+                      <Select 
+                        value={fetchForm.watch("adAccountId")} 
+                        onValueChange={(value) => {
+                          fetchForm.setValue("adAccountId", value);
+                          updateForm.setValue("adAccountId", value);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Ad Account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name} ({account.id})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Choose an ad account from the selected Business Manager
+                      </p>
+                    </div>
+                  )}
 
                   <FormField
                     control={fetchForm.control}
