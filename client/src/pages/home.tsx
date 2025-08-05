@@ -38,8 +38,8 @@ import {
   Loader2
 } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa";
-import { FacebookLoginButton } from "@/components/FacebookLoginButton";
-import { useFacebookAuth } from "@/hooks/useFacebookAuth";
+import { FacebookLoginButton } from "../components/FacebookLoginButton";
+import { Link } from "wouter";
 
 export default function Home() {
   const [showToken, setShowToken] = useState(false);
@@ -47,7 +47,6 @@ export default function Home() {
   const [lastResponse, setLastResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { getStoredToken } = useFacebookAuth();
 
   // Form for fetching account details
   const fetchForm = useForm({
@@ -70,12 +69,12 @@ export default function Home() {
 
   // Load stored Facebook token on component mount
   useEffect(() => {
-    const storedToken = getStoredToken();
+    const storedToken = sessionStorage.getItem('facebook_access_token');
     if (storedToken) {
       fetchForm.setValue("accessToken", storedToken);
       updateForm.setValue("accessToken", storedToken);
     }
-  }, [getStoredToken, fetchForm, updateForm]);
+  }, [fetchForm, updateForm]);
 
   // Fetch account mutation
   const fetchAccountMutation = useMutation({
@@ -171,14 +170,20 @@ export default function Home() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <FaFacebookF className="text-white text-sm" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <FaFacebookF className="text-white text-sm" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Facebook Ads Spend Cap Manager</h1>
+                <p className="text-sm text-gray-600">Manage ad account spend caps using Facebook Graph API</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Facebook Ads Spend Cap Manager</h1>
-              <p className="text-sm text-gray-600">Manage ad account spend caps using Facebook Graph API</p>
-            </div>
+            <nav className="flex items-center space-x-4">
+              <Link href="/" className="text-blue-600 font-medium">Manage Caps</Link>
+              <Link href="/reset-spend-cap" className="text-gray-600 hover:text-blue-600">Reset Caps</Link>
+            </nav>
           </div>
         </div>
       </header>
