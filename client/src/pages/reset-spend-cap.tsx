@@ -111,8 +111,8 @@ export default function ResetSpendCap() {
         // Filter for inactive accounts (no spending last month)
         if (data.success && data.data) {
           const inactiveAccounts = data.data.filter((account: any) => {
-            // This is a simple filter - you might want to enhance this logic
-            return !account.spend_cap || account.spend_cap === 0;
+            // Filter accounts with no spending last month
+            return account.last_month_spend === 0;
           });
           
           return {

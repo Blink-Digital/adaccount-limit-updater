@@ -297,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fetch ad accounts for a specific Business Manager with pagination
+  // Fetch ad accounts for a specific Business Manager with pagination and spending data  
   app.post("/api/facebook/business-manager-accounts", async (req, res) => {
     try {
       const { accessToken, businessId, page, limit } = businessManagerAccountsRequestSchema.parse(req.body);
@@ -317,13 +317,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const accounts = data.data || [];
-      const totalItems = data.paging?.total_count || accounts.length;
+      
+      // Get last month's date range
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = lastMonth.toISOString().split('T')[0];
+      const lastMonthEnd = new Date(thisMonth.getTime() - 1).toISOString().split('T')[0];
+      
+      // Enrich accounts with spending data
+      const enrichedAccounts = [];
+      for (const account of accounts) {
+        try {
+          // Get insights for last month
+          const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={"since":"${lastMonthStart}","until":"${lastMonthEnd}"}&access_token=${accessToken}`;
+          const insightsResponse = await fetch(insightsUrl);
+          const insightsData = await insightsResponse.json();
+          
+          let lastMonthSpend = 0;
+          if (insightsData.data && insightsData.data.length > 0) {
+            lastMonthSpend = parseFloat(insightsData.data[0].spend || '0');
+          }
+          
+          enrichedAccounts.push({
+            id: account.id,
+            name: account.name,
+            spend_cap: account.spend_cap,
+            last_month_spend: lastMonthSpend,
+            currency: account.currency || 'USD',
+            account_status: account.account_status
+          });
+        } catch (error) {
+          console.warn(`Failed to get insights for account ${account.id}:`, error);
+          // Include accounts where we can't get insights with 0 spend
+          enrichedAccounts.push({
+            id: account.id,
+            name: account.name,
+            spend_cap: account.spend_cap,
+            last_month_spend: 0,
+            currency: account.currency || 'USD',
+            account_status: account.account_status
+          });
+        }
+      }
+      
+      const totalItems = data.paging?.total_count || enrichedAccounts.length;
       const totalPages = Math.ceil(totalItems / limit);
       
-      const apiResponse: ApiResponse<FacebookAccount[]> = {
+      const apiResponse: ApiResponse<any[]> = {
         success: true,
-        data: accounts,
-        message: "Business manager accounts fetched successfully",
+        data: enrichedAccounts,
+        message: "Business manager accounts fetched successfully with spending data",
         pagination: {
           currentPage: page,
           totalPages,
