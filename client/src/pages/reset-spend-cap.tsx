@@ -8,6 +8,14 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Label } from "../components/ui/label";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { 
   Form, 
   FormControl, 
@@ -18,8 +26,11 @@ import {
 } from "../components/ui/form";
 import { 
   fetchAccountRequestSchema,
+  businessManagerRequestSchema,
+  businessManagerAccountsRequestSchema,
   type FacebookAccount,
-  type ApiResponse 
+  type ApiResponse,
+  type BusinessManager
 } from "@shared/schema";
 import { 
   Key, 
@@ -50,6 +61,8 @@ export default function ResetSpendCap() {
   const [accessToken, setAccessToken] = useState("");
   const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
   const [processedAccounts, setProcessedAccounts] = useState<Set<string>>(new Set());
+  const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const accountsPerPage = 20;
   const { toast } = useToast();
@@ -62,17 +75,66 @@ export default function ResetSpendCap() {
     }
   });
 
+  // Function to fetch business managers
+  const fetchBusinessManagers = async (token: string) => {
+    try {
+      const response = await apiRequest("POST", "/api/facebook/business-managers", { accessToken: token });
+      const data = await response.json();
+      if (data.success && data.data) {
+        setBusinessManagers(data.data);
+        // Auto-select first business manager if none selected
+        if (data.data.length > 0 && !selectedBusinessId) {
+          setSelectedBusinessId(data.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch business managers:", error);
+    }
+  };
+
   // Query to fetch inactive accounts with pagination
   const { data: inactiveAccounts, isLoading, error, refetch } = useQuery({
-    queryKey: ['/api/facebook/inactive-accounts', accessToken, currentPage],
+    queryKey: ['/api/facebook/inactive-accounts', accessToken, currentPage, selectedBusinessId],
     queryFn: async () => {
       if (!accessToken) return null;
-      const response = await apiRequest("POST", "/api/facebook/inactive-accounts", { 
-        accessToken, 
-        page: currentPage, 
-        limit: accountsPerPage 
-      });
-      return response.json();
+      
+      // If BM is selected, fetch from that BM, otherwise use old endpoint
+      if (selectedBusinessId) {
+        const response = await apiRequest("POST", "/api/facebook/business-manager-accounts", { 
+          accessToken,
+          businessId: selectedBusinessId,
+          page: currentPage, 
+          limit: accountsPerPage 
+        });
+        const data = await response.json();
+        
+        // Filter for inactive accounts (no spending last month)
+        if (data.success && data.data) {
+          const inactiveAccounts = data.data.filter((account: any) => {
+            // This is a simple filter - you might want to enhance this logic
+            return !account.spend_cap || account.spend_cap === 0;
+          });
+          
+          return {
+            success: true,
+            data: inactiveAccounts,
+            pagination: {
+              currentPage: currentPage,
+              totalPages: Math.ceil(inactiveAccounts.length / accountsPerPage),
+              totalItems: inactiveAccounts.length,
+              itemsPerPage: accountsPerPage
+            }
+          };
+        }
+        return data;
+      } else {
+        const response = await apiRequest("POST", "/api/facebook/inactive-accounts", { 
+          accessToken, 
+          page: currentPage, 
+          limit: accountsPerPage 
+        });
+        return response.json();
+      }
     },
     enabled: !!accessToken
   });
@@ -115,6 +177,21 @@ export default function ResetSpendCap() {
   const onSubmit = (data: { accessToken: string }) => {
     setAccessToken(data.accessToken);
     setCurrentPage(1); // Reset to first page when fetching new data
+    // Fetch business managers when token is submitted
+    fetchBusinessManagers(data.accessToken);
+  };
+
+  const handleFacebookLogin = (token: string) => {
+    setAccessToken(token);
+    form.setValue("accessToken", token);
+    sessionStorage.setItem('facebook_access_token', token);
+    // Fetch business managers when new token is received
+    fetchBusinessManagers(token);
+  };
+
+  const handleBusinessManagerChange = (businessId: string) => {
+    setSelectedBusinessId(businessId);
+    setCurrentPage(1); // Reset to first page when changing BM
   };
 
   const handleResetSpendCap = (accountId: string) => {
@@ -223,14 +300,37 @@ export default function ResetSpendCap() {
                           Required permissions: ads_read, ads_management
                         </p>
                         <FacebookLoginButton 
-                          onTokenReceived={(token: string) => {
-                            form.setValue("accessToken", token);
-                          }}
+                          onTokenReceived={handleFacebookLogin}
                         />
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  {/* Business Manager Selection */}
+                  {businessManagers.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Business Manager</Label>
+                      <Select 
+                        value={selectedBusinessId} 
+                        onValueChange={handleBusinessManagerChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Business Manager" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {businessManagers.map((bm) => (
+                            <SelectItem key={bm.id} value={bm.id}>
+                              {bm.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Choose which Business Manager to view inactive accounts from
+                      </p>
+                    </div>
+                  )}
 
                   <Button 
                     type="submit" 
