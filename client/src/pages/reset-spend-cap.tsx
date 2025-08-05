@@ -85,10 +85,14 @@ export default function ResetSpendCap() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (response: any, variables: { accountId: string }) => {
+      // Find the account to get its currency
+      const account = currentAccounts.find((acc: InactiveAccount) => acc.id === variables.accountId);
+      const currencyDisplay = account ? formatCurrencyForSetCap(account.currency) : '$1';
+      
       toast({
         title: "Success",
-        description: "Spend cap set to $1 successfully"
+        description: `Spend cap set to ${currencyDisplay} successfully`
       });
       setProcessingAccountId(null);
       refetch(); // Refresh the list
@@ -96,7 +100,7 @@ export default function ResetSpendCap() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to set spend cap to $1",
+        description: error.message || "Failed to set spend cap",
         variant: "destructive"
       });
       setProcessingAccountId(null);
@@ -118,6 +122,15 @@ export default function ResetSpendCap() {
       currency: currency,
       minimumFractionDigits: 2
     }).format(amount / 100); // Facebook returns amounts in cents
+  };
+
+  const formatCurrencyForSetCap = (currency: string = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(1);
   };
 
   // Get pagination info from API response
@@ -150,7 +163,7 @@ export default function ResetSpendCap() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Reset Spend Caps</h1>
-                <p className="text-sm text-gray-600">Set spend caps to $1 for accounts with no spending last month</p>
+                <p className="text-sm text-gray-600">Set spend caps to 1 unit for accounts with no spending last month</p>
               </div>
             </div>
             <nav className="flex items-center space-x-4">
@@ -344,7 +357,7 @@ export default function ResetSpendCap() {
                                   {processingAccountId === account.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
-                                    "Set to $1"
+                                    `Set to ${formatCurrencyForSetCap(account.currency)}`
                                   )}
                                 </Button>
                               </div>
