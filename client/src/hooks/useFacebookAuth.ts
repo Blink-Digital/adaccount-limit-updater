@@ -26,7 +26,7 @@ export const useFacebookAuth = () => {
     window.fbAsyncInit = function() {
       if (window.FB) {
         window.FB.init({
-          appId: '426361686419846', // Facebook App ID
+          appId: '1678172042635501', // Facebook App ID
           cookie: true,
           xfbml: true,
           version: 'v19.0'  // Updated to latest version
