@@ -112,9 +112,10 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Recent Changes
 
+- **August 7, 2025**: Updated Facebook App ID from `426361686419846` to `1678172042635501` in Facebook SDK configuration
+- **August 7, 2025**: Fixed Business Manager filtering issue on Reset page - updated filtering logic to use `last_month_spend === 0`
+- **August 7, 2025**: Enhanced Business Manager accounts API to include spending insights data for proper inactive account filtering
 - **January 30, 2025**: Fixed critical spend cap conversion bug - Facebook API expects dollar values, not cents
 - **January 30, 2025**: Updated default ad account ID to act_1003491274360037 per user preference
-- **January 30, 2025**: Added comprehensive debugging for API value tracking
-- **January 30, 2025**: Verified successful spend cap updates with correct dollar amounts
 
 The application is designed for easy development in Replit while maintaining production-ready architecture patterns. The modular structure allows for easy extension of Facebook API features and database operations.
