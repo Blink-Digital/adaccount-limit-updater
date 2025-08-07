@@ -109,10 +109,17 @@ export default function ResetSpendCap() {
         const data = await response.json();
         
         // Server already filters for active accounts with spend_cap > 1 unit
-        // We just need to ensure zero spending last month
+        // Add additional client-side filtering as backup
         if (data.success && data.data) {
           console.log(`[FRONTEND] Received ${data.data.length} accounts from server after spend_cap > 1 filtering`);
           const inactiveAccounts = data.data.filter((account: any) => {
+            // Double-check spend cap filtering client-side as backup
+            const spendCap = parseFloat(account.spend_cap || '0');
+            if (spendCap <= 1) {
+              console.log(`[FRONTEND] CLIENT-SIDE FILTERING OUT ${account.name} - spend_cap too low: ${account.spend_cap}`);
+              return false;
+            }
+            
             const hasZeroSpend = account.last_month_spend === 0;
             if (!hasZeroSpend) {
               console.log(`[FRONTEND] Filtering out ${account.name} - has spending: ${account.last_month_spend}`);
