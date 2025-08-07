@@ -152,9 +152,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Parse spend cap and ensure it's above 1 unit in their currency
         const spendCap = parseFloat(account.spend_cap);
         if (isNaN(spendCap) || spendCap <= 1) {
-          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
+          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
           return false;
         }
+        
+        console.log(`[INACTIVE-ACCOUNTS] Including account ${account.name} - spend_cap above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
         
         return true;
       });
@@ -353,9 +355,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Parse spend cap and ensure it's above 1 unit in their currency
         const spendCap = parseFloat(account.spend_cap);
         if (isNaN(spendCap) || spendCap <= 1) {
-          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
+          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
           return false;
         }
+        
+        console.log(`[BM-ACCOUNTS] Including account ${account.name} - spend_cap above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
         
         return true;
       });
