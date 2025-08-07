@@ -147,8 +147,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const spendCap = parseFloat(account.spend_cap || '0');
         if (spendCap === 0 || !account.spend_cap) return false;
         
-        // Only accounts with spend_cap > 1 unit in their currency
-        if (spendCap <= 1) return false;
+        // Only accounts with spend_cap > 1 unit in their currency (using strict comparison)
+        if (spendCap <= 1.0) {
+          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} with spend_cap: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
+          return false;
+        }
         
         return true;
       });
@@ -342,8 +345,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const spendCap = parseFloat(account.spend_cap || '0');
         if (spendCap === 0 || !account.spend_cap) return false;
         
-        // Only accounts with spend_cap > 1 unit in their currency
-        if (spendCap <= 1) return false;
+        // Only accounts with spend_cap > 1 unit in their currency (using strict comparison)
+        if (spendCap <= 1.0) {
+          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} with spend_cap: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
+          return false;
+        }
         
         return true;
       });
