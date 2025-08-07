@@ -445,11 +445,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { accessToken } = req.body;
       
-      if (!accessToken) {
-        return res.status(400).json({ error: "Access token required" });
+      if (!accessToken || typeof accessToken !== 'string') {
+        return res.status(400).json({ error: "Valid access token required" });
       }
       
-      console.log("=== Testing Facebook Graph API Filtering Capabilities ===\n");
+      // Sanitize token for logging (don't expose full token in logs)
+      const tokenPreview = accessToken.substring(0, 10) + "...";
+      
+      console.log(`=== Testing Facebook Graph API Filtering Capabilities ===`);
+      console.log(`Using token: ${tokenPreview}\n`);
       
       const results: any[] = [];
       
@@ -462,7 +466,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         const basicResponse = await fetch(basicUrl);
-        const basicData = await basicResponse.json();
+        const basicText = await basicResponse.text();
+        
+        let basicData;
+        try {
+          basicData = JSON.parse(basicText);
+        } catch (parseError) {
+          console.log("Failed to parse JSON response:", basicText.substring(0, 200));
+          basicData = { error: { message: "Invalid JSON response from Facebook API" } };
+        }
         results.push({
           test: "Basic Filter (account_status only)",
           success: basicResponse.ok,
@@ -491,7 +503,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         const spendCapResponse = await fetch(spendCapUrl);
-        const spendCapData = await spendCapResponse.json();
+        const spendCapText = await spendCapResponse.text();
+        
+        let spendCapData;
+        try {
+          spendCapData = JSON.parse(spendCapText);
+        } catch (parseError) {
+          console.log("Failed to parse spend cap JSON response:", spendCapText.substring(0, 200));
+          spendCapData = { error: { message: "Invalid JSON response from Facebook API" } };
+        }
         results.push({
           test: "Spend Cap Filter",
           success: spendCapResponse.ok,
@@ -527,7 +547,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           const operatorResponse = await fetch(operatorUrl);
-          const operatorData = await operatorResponse.json();
+          const operatorText = await operatorResponse.text();
+          
+          let operatorData;
+          try {
+            operatorData = JSON.parse(operatorText);
+          } catch (parseError) {
+            console.log(`Failed to parse ${operator} JSON response:`, operatorText.substring(0, 200));
+            operatorData = { error: { message: "Invalid JSON response from Facebook API" } };
+          }
           results.push({
             test: `Spend Cap ${operator}`,
             success: operatorResponse.ok,
