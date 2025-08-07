@@ -138,13 +138,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allInactiveAccounts: InactiveAccount[] = [];
 
-      // Filter accounts: only active accounts with spend_cap > $1
+      // Filter accounts: active accounts with spend_cap > 1 unit in their currency, excluding zero/null spend caps
       const filteredAccounts = accountsData.data.filter((account: any) => {
         // Only active accounts (account_status = 1)
         if (account.account_status !== 1) return false;
         
-        // Only accounts with spend_cap > $1
+        // Exclude accounts with zero or null spend_cap
         const spendCap = parseFloat(account.spend_cap || '0');
+        if (spendCap === 0 || !account.spend_cap) return false;
+        
+        // Only accounts with spend_cap > 1 unit in their currency
         if (spendCap <= 1) return false;
         
         return true;
@@ -330,13 +333,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const accounts = data.data || [];
       
-      // Filter accounts: only active accounts with spend_cap > $1
+      // Filter accounts: active accounts with spend_cap > 1 unit in their currency, excluding zero/null spend caps
       const filteredAccounts = accounts.filter((account: any) => {
         // Only active accounts (account_status = 1)
         if (account.account_status !== 1) return false;
         
-        // Only accounts with spend_cap > $1
+        // Exclude accounts with zero or null spend_cap
         const spendCap = parseFloat(account.spend_cap || '0');
+        if (spendCap === 0 || !account.spend_cap) return false;
+        
+        // Only accounts with spend_cap > 1 unit in their currency
         if (spendCap <= 1) return false;
         
         return true;
