@@ -144,12 +144,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (account.account_status !== 1) return false;
         
         // Exclude accounts with zero or null spend_cap
-        const spendCap = parseFloat(account.spend_cap || '0');
-        if (spendCap === 0 || !account.spend_cap) return false;
+        if (!account.spend_cap || account.spend_cap === '0' || account.spend_cap === null) {
+          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} - zero/null spend_cap: ${account.spend_cap}`);
+          return false;
+        }
         
-        // Only accounts with spend_cap > 1 unit in their currency (using strict comparison)
-        if (spendCap <= 1.0) {
-          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} with spend_cap: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
+        // Parse spend cap and ensure it's above 1 unit in their currency
+        const spendCap = parseFloat(account.spend_cap);
+        if (isNaN(spendCap) || spendCap <= 1) {
+          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
           return false;
         }
         
@@ -342,12 +345,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (account.account_status !== 1) return false;
         
         // Exclude accounts with zero or null spend_cap
-        const spendCap = parseFloat(account.spend_cap || '0');
-        if (spendCap === 0 || !account.spend_cap) return false;
+        if (!account.spend_cap || account.spend_cap === '0' || account.spend_cap === null) {
+          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} - zero/null spend_cap: ${account.spend_cap}`);
+          return false;
+        }
         
-        // Only accounts with spend_cap > 1 unit in their currency (using strict comparison)
-        if (spendCap <= 1.0) {
-          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} with spend_cap: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
+        // Parse spend cap and ensure it's above 1 unit in their currency
+        const spendCap = parseFloat(account.spend_cap);
+        if (isNaN(spendCap) || spendCap <= 1) {
+          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: ${account.spend_cap} (parsed: ${spendCap}) in ${account.currency}`);
           return false;
         }
         
