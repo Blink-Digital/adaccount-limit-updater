@@ -115,8 +115,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { accessToken, page = 1, limit = 20 } = inactiveAccountsRequestSchema.parse(req.body);
       
-      // Get all ad accounts for the user
-      const accountsUrl = `https://graph.facebook.com/me/adaccounts?fields=id,name,spend_cap,account_status,currency&access_token=${accessToken}`;
+      // Get all active ad accounts for the user (filter by account_status=1 at Facebook API level)
+      const filtering = JSON.stringify([{"field":"account_status","operator":"EQUAL","value":"1"}]);
+      const accountsUrl = `https://graph.facebook.com/me/adaccounts?fields=id,name,spend_cap,account_status,currency&filtering=${encodeURIComponent(filtering)}&limit=1000&access_token=${accessToken}`;
       const accountsResponse = await fetch(accountsUrl);
       const accountsData = await accountsResponse.json();
       
@@ -138,10 +139,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allInactiveAccounts: InactiveAccount[] = [];
 
-      // Filter accounts: active accounts with spend_cap > 1 unit in their currency, excluding zero/null spend caps
+      // Filter accounts: spend_cap > 1 unit in their currency, excluding zero/null spend caps
+      // (Active accounts already filtered at Facebook API level)
       const filteredAccounts = accountsData.data.filter((account: any) => {
-        // Only active accounts (account_status = 1)
-        if (account.account_status !== 1) return false;
         
         // Exclude accounts with zero or null spend_cap
         if (!account.spend_cap || account.spend_cap === '0' || account.spend_cap === null) {
@@ -329,7 +329,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { accessToken, businessId, page, limit } = businessManagerAccountsRequestSchema.parse(req.body);
       
       const offset = (page - 1) * limit;
-      const url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&limit=${limit}&offset=${offset}&access_token=${accessToken}`;
+      // Filter by active accounts (account_status=1) at Facebook API level
+      const filtering = JSON.stringify([{"field":"account_status","operator":"EQUAL","value":"1"}]);
+      const url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=${encodeURIComponent(filtering)}&limit=${limit}&offset=${offset}&access_token=${accessToken}`;
       
       const response = await fetch(url);
       const data = await response.json();
@@ -344,10 +346,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const accounts = data.data || [];
       
-      // Filter accounts: active accounts with spend_cap > 1 unit in their currency, excluding zero/null spend caps
+      // Filter accounts: spend_cap > 1 unit in their currency, excluding zero/null spend caps
+      // (Active accounts already filtered at Facebook API level)
       const filteredAccounts = accounts.filter((account: any) => {
-        // Only active accounts (account_status = 1)
-        if (account.account_status !== 1) return false;
         
         // Exclude accounts with zero or null spend_cap
         if (!account.spend_cap || account.spend_cap === '0' || account.spend_cap === null) {
