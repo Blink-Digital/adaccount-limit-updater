@@ -108,11 +108,18 @@ export default function ResetSpendCap() {
         });
         const data = await response.json();
         
-        // Filter for inactive accounts (no spending last month)
+        // Server already filters for active accounts with spend_cap > 1 unit
+        // We just need to ensure zero spending last month
         if (data.success && data.data) {
+          console.log(`[FRONTEND] Received ${data.data.length} accounts from server after spend_cap > 1 filtering`);
           const inactiveAccounts = data.data.filter((account: any) => {
-            // Filter accounts with no spending last month
-            return account.last_month_spend === 0;
+            const hasZeroSpend = account.last_month_spend === 0;
+            if (!hasZeroSpend) {
+              console.log(`[FRONTEND] Filtering out ${account.name} - has spending: ${account.last_month_spend}`);
+            } else {
+              console.log(`[FRONTEND] Including ${account.name} - spend_cap: ${account.spend_cap}, last_month_spend: ${account.last_month_spend}`);
+            }
+            return hasZeroSpend;
           });
           
           return {
