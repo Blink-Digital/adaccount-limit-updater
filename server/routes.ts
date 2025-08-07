@@ -138,8 +138,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allInactiveAccounts: InactiveAccount[] = [];
 
-      // Check spending for each account
-      for (const account of accountsData.data) {
+      // Filter accounts: only active accounts with spend_cap > $1
+      const filteredAccounts = accountsData.data.filter((account: any) => {
+        // Only active accounts (account_status = 1)
+        if (account.account_status !== 1) return false;
+        
+        // Only accounts with spend_cap > $1
+        const spendCap = parseFloat(account.spend_cap || '0');
+        if (spendCap <= 1) return false;
+        
+        return true;
+      });
+
+      // Check spending for each filtered account
+      for (const account of filteredAccounts) {
         try {
           // Get insights for last month
           const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={'since':'${since}','until':'${until}'}&access_token=${accessToken}`;
@@ -318,6 +330,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const accounts = data.data || [];
       
+      // Filter accounts: only active accounts with spend_cap > $1
+      const filteredAccounts = accounts.filter((account: any) => {
+        // Only active accounts (account_status = 1)
+        if (account.account_status !== 1) return false;
+        
+        // Only accounts with spend_cap > $1
+        const spendCap = parseFloat(account.spend_cap || '0');
+        if (spendCap <= 1) return false;
+        
+        return true;
+      });
+      
       // Get last month's date range
       const now = new Date();
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -325,9 +349,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastMonthStart = lastMonth.toISOString().split('T')[0];
       const lastMonthEnd = new Date(thisMonth.getTime() - 1).toISOString().split('T')[0];
       
-      // Enrich accounts with spending data
+      // Enrich filtered accounts with spending data
       const enrichedAccounts = [];
-      for (const account of accounts) {
+      for (const account of filteredAccounts) {
         try {
           // Get insights for last month
           const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={"since":"${lastMonthStart}","until":"${lastMonthEnd}"}&access_token=${accessToken}`;
@@ -361,7 +385,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const totalItems = data.paging?.total_count || enrichedAccounts.length;
+      // Update pagination to reflect filtered results
+      const totalItems = enrichedAccounts.length;
       const totalPages = Math.ceil(totalItems / limit);
       
       const apiResponse: ApiResponse<any[]> = {
