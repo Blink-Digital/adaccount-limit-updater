@@ -232,7 +232,7 @@ export default function ResetSpendCap() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Reset Spend Caps</h1>
-                <p className="text-sm text-gray-600">Set spend caps to 1 unit for accounts with no spending last month</p>
+                <p className="text-sm text-gray-600">Review active ad accounts and reset spend caps as needed</p>
               </div>
             </div>
             <nav className="flex items-center space-x-4">
@@ -342,8 +342,8 @@ export default function ResetSpendCap() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Calendar className="h-5 w-5 text-amber-600" />
-                    <span>Accounts with No Spending Last Month</span>
+                    <Calendar className="h-5 w-5 text-blue-600" />
+                    <span>Active Ad Accounts</span>
                   </div>
                   {inactiveAccounts?.data && (
                     <Badge variant="secondary">
@@ -377,8 +377,8 @@ export default function ResetSpendCap() {
                     {inactiveAccounts.data.length === 0 ? (
                       <div className="text-center py-8">
                         <DollarSign className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-gray-900">All Accounts Active</h3>
-                        <p className="text-gray-600">All your ad accounts had spending activity last month.</p>
+                        <h3 className="text-lg font-medium text-gray-900">No Accounts Found</h3>
+                        <p className="text-gray-600">No active ad accounts found in this Business Manager.</p>
                       </div>
                     ) : (
                       <>
@@ -419,26 +419,10 @@ export default function ResetSpendCap() {
                                     <p className="text-sm text-gray-500">{account.id}</p>
                                   </div>
                                 </div>
-                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                   <div>
-                                    <span className="text-gray-500">Current Spend Cap:</span>
-                                    <div className="font-medium">
-                                      {processedAccounts.has(account.id) ? (
-                                        <span className="text-green-600">
-                                          {formatCurrencyForSetCap(account.currency)}
-                                        </span>
-                                      ) : (
-                                        account.spend_cap ? 
-                                          formatCurrency(account.spend_cap, account.currency) : 
-                                          "No limit"
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Last Month Spend:</span>
-                                    <div className="font-medium">
-                                      {formatCurrency(account.last_month_spend, account.currency)}
-                                    </div>
+                                    <span className="text-gray-500">Currency:</span>
+                                    <div className="font-medium">{account.currency}</div>
                                   </div>
                                   <div>
                                     <span className="text-gray-500">Status:</span>

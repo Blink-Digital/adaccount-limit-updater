@@ -346,98 +346,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const accounts = data.data || [];
       
-      // Filter accounts: spend_cap > 1 unit in their currency, excluding zero/null spend caps
-      // (Active accounts already filtered at Facebook API level)
-      const filteredAccounts = accounts.filter((account: any) => {
-        
-        // Exclude accounts with zero or null spend_cap
-        if (!account.spend_cap || account.spend_cap === '0' || account.spend_cap === null) {
-          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} - zero/null spend_cap: ${account.spend_cap}`);
-          return false;
-        }
-        
-        // Parse spend cap and ensure it's above 1 unit in their currency
-        const spendCapStr = String(account.spend_cap).trim();
-        const spendCap = parseFloat(spendCapStr);
-        
-        // Strict filtering: exclude accounts with spend_cap = 1 or less  
-        if (isNaN(spendCap) || spendCap <= 1 || spendCapStr === '1' || spendCapStr === '1.0' || spendCapStr === '1.00') {
-          console.log(`[BM-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
-          return false;
-        }
-        
-        console.log(`[BM-ACCOUNTS] Including account ${account.name} - spend_cap above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
-        
-        return true;
-      });
+      // Transform accounts to consistent format - no filtering, just active accounts
+      const formattedAccounts = accounts.map((account: any) => ({
+        id: account.id,
+        name: account.name,
+        spend_cap: account.spend_cap,
+        currency: account.currency || 'USD',
+        account_status: account.account_status
+      }));
       
-      // Get last month's date range
-      const now = new Date();
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastMonthStart = lastMonth.toISOString().split('T')[0];
-      const lastMonthEnd = new Date(thisMonth.getTime() - 1).toISOString().split('T')[0];
+      console.log(`[BM-ACCOUNTS] Retrieved ${formattedAccounts.length} active accounts from Facebook API`);
       
-      // Enrich filtered accounts with spending data and filter by zero spending
-      const enrichedAccounts = [];
-      for (const account of filteredAccounts) {
-        try {
-          // Get insights for last month
-          const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={"since":"${lastMonthStart}","until":"${lastMonthEnd}"}&access_token=${accessToken}`;
-          const insightsResponse = await fetch(insightsUrl);
-          const insightsData = await insightsResponse.json();
-          
-          let lastMonthSpend = 0;
-          if (insightsData.data && insightsData.data.length > 0) {
-            lastMonthSpend = parseFloat(insightsData.data[0].spend || '0');
-          }
-          
-          // Filter for inactive accounts (zero spend last month) - SERVER-SIDE
-          if (lastMonthSpend === 0) {
-            console.log(`[BM-ACCOUNTS] Including INACTIVE account ${account.name} - last_month_spend: ${lastMonthSpend}`);
-            enrichedAccounts.push({
-              id: account.id,
-              name: account.name,
-              spend_cap: account.spend_cap,
-              last_month_spend: lastMonthSpend,
-              currency: account.currency || 'USD',
-              account_status: account.account_status
-            });
-          } else {
-            console.log(`[BM-ACCOUNTS] Filtering out ACTIVE account ${account.name} - last_month_spend: ${lastMonthSpend}`);
-          }
-        } catch (error) {
-          console.warn(`Failed to get insights for account ${account.id}:`, error);
-          // Include accounts where we can't get insights with 0 spend (assume inactive)
-          console.log(`[BM-ACCOUNTS] Including account ${account.name} - no insights data (assuming inactive)`);
-          enrichedAccounts.push({
-            id: account.id,
-            name: account.name,
-            spend_cap: account.spend_cap,
-            last_month_spend: 0,
-            currency: account.currency || 'USD',
-            account_status: account.account_status
-          });
-        }
-      }
-      
-      // Apply pagination to final filtered results  
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedAccounts = enrichedAccounts.slice(startIndex, endIndex);
-      
-      // Update pagination to reflect all inactive accounts found
-      const totalItems = enrichedAccounts.length;
-      const totalPages = Math.ceil(totalItems / limit);
+      // Use Facebook's native pagination (accounts are already paginated by Facebook)
+      const totalItems = data.paging?.cursors ? undefined : formattedAccounts.length; // Facebook handles total count
+      const totalPages = totalItems ? Math.ceil(totalItems / limit) : undefined;
       
       const apiResponse: ApiResponse<any[]> = {
         success: true,
-        data: paginatedAccounts,
-        message: "Inactive accounts fetched successfully with spending data",
+        data: formattedAccounts,
+        message: "Active accounts fetched successfully",
         pagination: {
           currentPage: page,
-          totalPages,
-          totalItems,
+          totalPages: totalPages || Math.ceil(formattedAccounts.length / limit),
+          totalItems: totalItems || formattedAccounts.length,
           itemsPerPage: limit
         }
       };
