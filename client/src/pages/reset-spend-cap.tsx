@@ -530,11 +530,18 @@ export default function ResetSpendCap() {
                         <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
                           <Button
                             onClick={goToPreviousPage}
-                            disabled={currentPage === 1}
+                            disabled={currentPage === 1 || isLoading}
                             variant="outline"
                             size="sm"
                           >
-                            Previous
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Loading...
+                              </>
+                            ) : (
+                              'Previous'
+                            )}
                           </Button>
                           
                           <div className="flex items-center space-x-2 px-4">
@@ -543,11 +550,18 @@ export default function ResetSpendCap() {
                           
                           <Button
                             onClick={goToNextPage}
-                            disabled={currentAccounts.length < accountsPerPage}
+                            disabled={currentAccounts.length < accountsPerPage || isLoading}
                             variant="outline"
                             size="sm"
                           >
-                            Next
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Loading...
+                              </>
+                            ) : (
+                              'Next'
+                            )}
                           </Button>
                         </div>
                       </>
