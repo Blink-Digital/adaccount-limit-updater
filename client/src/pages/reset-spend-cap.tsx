@@ -144,21 +144,36 @@ export default function ResetSpendCap() {
     }
   };
 
-  // Auto-load spend data for all accounts when they're loaded
+  // Track account IDs to only fetch spend data when accounts actually change
+  const [previousAccountIds, setPreviousAccountIds] = useState<string[]>([]);
+
+  // Auto-load spend data for all accounts when NEW accounts are loaded
   useEffect(() => {
     if (accountsData?.data && accessToken) {
       const accounts = accountsData.data;
-      console.log(`[SPEND-LOADER] Auto-loading spend data for ${accounts.length} accounts`);
+      const currentAccountIds = accounts.map((acc: InactiveAccount) => acc.id);
       
-      // Clear previous spend data
-      setAccountSpends({});
+      // Only fetch spend data if the actual account IDs changed (new accounts loaded)
+      const idsChanged = JSON.stringify(currentAccountIds) !== JSON.stringify(previousAccountIds);
       
-      // Fetch spend for all accounts
-      accounts.forEach((account: InactiveAccount) => {
-        fetchAccountSpend(account.id);
-      });
+      if (idsChanged) {
+        console.log(`[SPEND-LOADER] New accounts loaded - auto-loading spend data for ${accounts.length} accounts`);
+        
+        // Clear previous spend data
+        setAccountSpends({});
+        
+        // Fetch spend for all accounts
+        accounts.forEach((account: InactiveAccount) => {
+          fetchAccountSpend(account.id);
+        });
+        
+        // Update tracked account IDs
+        setPreviousAccountIds(currentAccountIds);
+      } else {
+        console.log(`[SPEND-LOADER] Account properties updated but IDs unchanged - skipping spend refresh`);
+      }
     }
-  }, [accountsData?.data, accessToken]);
+  }, [accountsData?.data, accessToken, previousAccountIds]);
 
   // Manual fetch function
   const fetchAccountsManually = async (cursor?: string | null) => {
