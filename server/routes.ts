@@ -326,12 +326,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fetch ad accounts for a specific Business Manager with pagination and spending data  
   app.post("/api/facebook/business-manager-accounts", async (req, res) => {
     try {
-      const { accessToken, businessId, page, limit } = businessManagerAccountsRequestSchema.parse(req.body);
+      const { accessToken, businessId, page, limit, after } = req.body;
       
-      const offset = (page - 1) * limit;
+      // Use cursor-based pagination instead of offset
       // Filter by active accounts (account_status=1) at Facebook API level
       const filtering = JSON.stringify([{"field":"account_status","operator":"EQUAL","value":"1"}]);
-      const url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=${encodeURIComponent(filtering)}&limit=${limit}&offset=${offset}&access_token=${accessToken}`;
+      let url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=${encodeURIComponent(filtering)}&limit=${limit}&access_token=${accessToken}`;
+      
+      // Add cursor for pagination if provided
+      if (after) {
+        url += `&after=${encodeURIComponent(after)}`;
+        console.log(`[BM-ACCOUNTS] Using cursor pagination with after: ${after.substring(0, 20)}...`);
+      } else {
+        console.log(`[BM-ACCOUNTS] Fetching first page (no cursor)`);
+      }
       
       const response = await fetch(url);
       const data = await response.json();
@@ -356,32 +364,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       console.log(`[BM-ACCOUNTS] Retrieved ${formattedAccounts.length} active accounts from Facebook API`);
-      console.log(`[BM-ACCOUNTS] Facebook paging info:`, data.paging ? 'Has paging cursors' : 'No paging info');
+      console.log(`[BM-ACCOUNTS] Facebook paging info:`, data.paging ? JSON.stringify(data.paging) : 'No paging info');
       
-      // Facebook doesn't provide total count - estimate based on current page data
-      const hasNextPage = data.paging?.next ? true : false;
-      const hasPreviousPage = page > 1;
-      
-      // Estimate total pages (we don't know exact total from Facebook)
-      let estimatedTotalPages = page;
-      if (hasNextPage) {
-        estimatedTotalPages = page + 1; // At least one more page
-      }
-      if (formattedAccounts.length === limit && hasNextPage) {
-        estimatedTotalPages = page + 2; // Likely more pages
-      }
+      // Extract cursor information from Facebook's response
+      const nextCursor = data.paging?.cursors?.after || null;
+      const previousCursor = data.paging?.cursors?.before || null;
+      const hasNextPage = !!data.paging?.next;
+      const hasPreviousPage = !!data.paging?.previous;
       
       const apiResponse: ApiResponse<any[]> = {
         success: true,
         data: formattedAccounts,
         message: "Active accounts fetched successfully",
         pagination: {
-          currentPage: page,
-          totalPages: estimatedTotalPages,
+          currentPage: page || 1,
+          totalPages: hasNextPage ? (page || 1) + 1 : (page || 1), // Estimate
           totalItems: formattedAccounts.length, // Current page count
           itemsPerPage: limit,
           hasNextPage,
-          hasPreviousPage
+          hasPreviousPage,
+          nextCursor,
+          previousCursor
         }
       };
       

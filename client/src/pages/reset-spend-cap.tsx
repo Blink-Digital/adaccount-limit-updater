@@ -64,6 +64,8 @@ export default function ResetSpendCap() {
   const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [previousCursor, setPreviousCursor] = useState<string | null>(null);
   const accountsPerPage = 20;
   const { toast } = useToast();
 
@@ -94,25 +96,37 @@ export default function ResetSpendCap() {
 
   // Query to fetch inactive accounts with pagination
   const { data: inactiveAccounts, isLoading, error, refetch } = useQuery({
-    queryKey: ['business-manager-accounts', selectedBusinessId, currentPage, accessToken],
+    queryKey: ['business-manager-accounts', selectedBusinessId, currentPage, nextCursor, accessToken],
     queryFn: async () => {
-      console.log(`[QUERY] Fetching page ${currentPage} for BM ${selectedBusinessId}`);
+      console.log(`[QUERY] Fetching page ${currentPage} for BM ${selectedBusinessId} with cursor: ${nextCursor?.substring(0, 20) || 'none'}`);
       if (!accessToken) return null;
       
       // If BM is selected, fetch from that BM, otherwise use old endpoint
       if (selectedBusinessId) {
-        const response = await apiRequest("POST", "/api/facebook/business-manager-accounts", { 
+        const requestBody: any = { 
           accessToken,
           businessId: selectedBusinessId,
           page: currentPage, 
           limit: accountsPerPage 
-        });
+        };
+        
+        // Add cursor for pagination
+        if (currentPage > 1 && nextCursor) {
+          requestBody.after = nextCursor;
+        }
+        
+        const response = await apiRequest("POST", "/api/facebook/business-manager-accounts", requestBody);
         const data = await response.json();
         
-        // Server now handles all filtering (active accounts, spend_cap > 1, zero spending)
+        // Update cursors from response
+        if (data.success && data.pagination) {
+          setNextCursor(data.pagination.nextCursor);
+          setPreviousCursor(data.pagination.previousCursor);
+          console.log(`[FRONTEND] Updated cursors - next: ${data.pagination.nextCursor?.substring(0, 20) || 'none'}, prev: ${data.pagination.previousCursor?.substring(0, 20) || 'none'}`);
+        }
+        
         if (data.success && data.data) {
           console.log(`[FRONTEND] Received ${data.data.length} accounts from server for page ${currentPage}`);
-          // Server-side filtering is complete, just return the data with proper pagination
         }
         return data;
       } else {
@@ -183,6 +197,8 @@ export default function ResetSpendCap() {
     console.log(`[BM-CHANGE] Changing Business Manager to: ${businessId}`);
     setSelectedBusinessId(businessId);
     setCurrentPage(1); // Reset to first page when changing BM
+    setNextCursor(null); // Reset cursors
+    setPreviousCursor(null);
   };
 
   const handleResetSpendCap = (accountId: string) => {
@@ -223,11 +239,13 @@ export default function ResetSpendCap() {
   };
 
   const goToNextPage = () => {
-    // Allow going to next page if we have exactly the limit (likely more pages)
-    const hasMoreData = inactiveAccounts?.pagination?.hasNextPage || 
-                       (currentAccounts.length === accountsPerPage);
-    console.log(`[PAGINATION] Next page clicked. Current accounts: ${currentAccounts.length}, hasMoreData: ${hasMoreData}`);
-    if (hasMoreData) {
+    // Use Facebook's hasNextPage and nextCursor
+    const hasNextPageData = inactiveAccounts?.pagination?.hasNextPage;
+    const nextCursorData = inactiveAccounts?.pagination?.nextCursor;
+    console.log(`[PAGINATION] Next page clicked. hasNextPage: ${hasNextPageData}, nextCursor: ${nextCursorData?.substring(0, 20) || 'none'}`);
+    
+    if (hasNextPageData && nextCursorData) {
+      setNextCursor(nextCursorData);
       setCurrentPage(prev => {
         console.log(`[PAGINATION] Changing page from ${prev} to ${prev + 1}`);
         return prev + 1;

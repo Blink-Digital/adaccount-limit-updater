@@ -37,7 +37,9 @@ export const businessManagerAccountsRequestSchema = z.object({
   accessToken: z.string().min(1, "Access token is required"),
   businessId: z.string().min(1, "Business ID is required"),
   page: z.number().min(1).default(1),
-  limit: z.number().min(1).max(100).default(20)
+  limit: z.number().min(1).max(100).default(20),
+  after: z.string().optional(), // Facebook cursor for next page
+  before: z.string().optional() // Facebook cursor for previous page
 });
 
 export const businessManagerSchema = z.object({
@@ -77,5 +79,7 @@ export interface ApiResponse<T = any> {
     itemsPerPage: number;
     hasNextPage?: boolean;
     hasPreviousPage?: boolean;
+    nextCursor?: string | null;
+    previousCursor?: string | null;
   };
 }
