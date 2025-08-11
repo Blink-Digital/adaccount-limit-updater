@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -94,54 +94,61 @@ export default function ResetSpendCap() {
     }
   };
 
-  // Query to fetch inactive accounts with pagination
-  const { data: inactiveAccounts, isLoading, error, refetch } = useQuery({
-    queryKey: ['business-manager-accounts', selectedBusinessId, currentPage, nextCursor, accessToken],
-    queryFn: async () => {
-      console.log(`[QUERY] Fetching page ${currentPage} for BM ${selectedBusinessId} with cursor: ${nextCursor?.substring(0, 20) || 'none'}`);
-      if (!accessToken) return null;
+  // Use manual fetching to avoid React Query cursor loops
+  const [isManualLoading, setIsManualLoading] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [accountsData, setAccountsData] = useState<any>(null);
+
+  // Manual fetch function
+  const fetchAccountsManually = async (cursor?: string | null) => {
+    if (!accessToken || !selectedBusinessId) return;
+    
+    setIsManualLoading(true);
+    setManualError(null);
+    
+    try {
+      const requestBody: any = { 
+        accessToken,
+        businessId: selectedBusinessId,
+        page: currentPage, 
+        limit: accountsPerPage 
+      };
       
-      // If BM is selected, fetch from that BM, otherwise use old endpoint
-      if (selectedBusinessId) {
-        const requestBody: any = { 
-          accessToken,
-          businessId: selectedBusinessId,
-          page: currentPage, 
-          limit: accountsPerPage 
-        };
-        
-        // Add cursor for pagination
-        if (currentPage > 1 && nextCursor) {
-          requestBody.after = nextCursor;
-        }
-        
-        const response = await apiRequest("POST", "/api/facebook/business-manager-accounts", requestBody);
-        const data = await response.json();
-        
-        // Update cursors from response
-        if (data.success && data.pagination) {
-          setNextCursor(data.pagination.nextCursor);
-          setPreviousCursor(data.pagination.previousCursor);
-          console.log(`[FRONTEND] Updated cursors - next: ${data.pagination.nextCursor?.substring(0, 20) || 'none'}, prev: ${data.pagination.previousCursor?.substring(0, 20) || 'none'}`);
-        }
-        
-        if (data.success && data.data) {
-          console.log(`[FRONTEND] Received ${data.data.length} accounts from server for page ${currentPage}`);
-        }
-        return data;
-      } else {
-        const response = await apiRequest("POST", "/api/facebook/inactive-accounts", { 
-          accessToken, 
-          page: currentPage, 
-          limit: accountsPerPage 
-        });
-        return response.json();
+      if (cursor) {
+        requestBody.after = cursor;
+        console.log(`[MANUAL-FETCH] Using cursor: ${cursor.substring(0, 30)}...`);
       }
-    },
-    enabled: !!accessToken && !!selectedBusinessId,
-    staleTime: 0, // Always fetch fresh data
-    cacheTime: 1000 * 60 * 5 // Cache for 5 minutes
-  });
+      
+      const response = await apiRequest("POST", "/api/facebook/business-manager-accounts", requestBody);
+      const data = await response.json();
+      
+      if (data.success) {
+        setAccountsData(data);
+        console.log(`[MANUAL-FETCH] Success: ${data.data?.length || 0} accounts for page ${currentPage}`);
+      } else {
+        setManualError(data.error || 'Failed to fetch accounts');
+      }
+    } catch (error: any) {
+      setManualError(error.message || 'Network error');
+      console.error('[MANUAL-FETCH] Error:', error);
+    } finally {
+      setIsManualLoading(false);
+    }
+  };
+
+  // Initial fetch when access token or business manager changes
+  useEffect(() => {
+    if (accessToken && selectedBusinessId && currentPage === 1) {
+      setNextCursor(null);
+      setPreviousCursor(null);
+      fetchAccountsManually();
+    }
+  }, [accessToken, selectedBusinessId]);
+
+  // Expose data in the expected format
+  const inactiveAccounts = accountsData;
+  const isLoading = isManualLoading;
+  const error = manualError;
 
   // Mutation to set spend cap to $1 for an account
   const resetSpendCapMutation = useMutation({
@@ -233,23 +240,40 @@ export default function ResetSpendCap() {
     setCurrentPage(page);
   };
 
-  const goToPreviousPage = () => {
-    console.log(`[PAGINATION] Going to previous page from ${currentPage}`);
-    setCurrentPage(prev => Math.max(1, prev - 1));
-  };
+
 
   const goToNextPage = () => {
-    // Use Facebook's hasNextPage and nextCursor
-    const hasNextPageData = inactiveAccounts?.pagination?.hasNextPage;
-    const nextCursorData = inactiveAccounts?.pagination?.nextCursor;
+    const hasNextPageData = accountsData?.pagination?.hasNextPage;
+    const nextCursorData = accountsData?.pagination?.nextCursor;
     console.log(`[PAGINATION] Next page clicked. hasNextPage: ${hasNextPageData}, nextCursor: ${nextCursorData?.substring(0, 20) || 'none'}`);
     
     if (hasNextPageData && nextCursorData) {
+      const newPage = currentPage + 1;
+      console.log(`[PAGINATION] Going from page ${currentPage} to ${newPage}`);
+      setCurrentPage(newPage);
       setNextCursor(nextCursorData);
-      setCurrentPage(prev => {
-        console.log(`[PAGINATION] Changing page from ${prev} to ${prev + 1}`);
-        return prev + 1;
-      });
+      fetchAccountsManually(nextCursorData);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      const newPage = currentPage - 1;
+      console.log(`[PAGINATION] Going from page ${currentPage} to ${newPage}`);
+      setCurrentPage(newPage);
+      
+      if (newPage === 1) {
+        // Go back to first page (no cursor)
+        setNextCursor(null);
+        setPreviousCursor(null);
+        fetchAccountsManually();
+      } else {
+        // This is simplified - for full implementation, we'd need to track cursors for each page
+        toast({
+          title: "Navigation Limitation",
+          description: "Currently only Next and back to first page are supported"
+        });
+      }
     }
   };
 
@@ -399,7 +423,7 @@ export default function ResetSpendCap() {
                       <AlertTriangle className="h-5 w-5 text-red-600 mt-1" />
                       <div>
                         <h3 className="text-sm font-medium text-red-800">Error</h3>
-                        <p className="text-sm text-red-700 mt-1">{error.message}</p>
+                        <p className="text-sm text-red-700 mt-1">{typeof error === 'string' ? error : error?.message}</p>
                       </div>
                     </div>
                   </div>
