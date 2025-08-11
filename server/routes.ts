@@ -356,10 +356,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       console.log(`[BM-ACCOUNTS] Retrieved ${formattedAccounts.length} active accounts from Facebook API`);
+      console.log(`[BM-ACCOUNTS] Facebook paging info:`, data.paging ? 'Has paging cursors' : 'No paging info');
       
-      // Use Facebook's native pagination (accounts are already paginated by Facebook)
-      const totalItems = data.paging?.cursors ? undefined : formattedAccounts.length; // Facebook handles total count
-      const totalPages = totalItems ? Math.ceil(totalItems / limit) : undefined;
+      // Facebook doesn't provide total count - estimate based on current page data
+      const hasNextPage = data.paging?.next ? true : false;
+      const hasPreviousPage = page > 1;
+      
+      // Estimate total pages (we don't know exact total from Facebook)
+      let estimatedTotalPages = page;
+      if (hasNextPage) {
+        estimatedTotalPages = page + 1; // At least one more page
+      }
+      if (formattedAccounts.length === limit && hasNextPage) {
+        estimatedTotalPages = page + 2; // Likely more pages
+      }
       
       const apiResponse: ApiResponse<any[]> = {
         success: true,
@@ -367,9 +377,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Active accounts fetched successfully",
         pagination: {
           currentPage: page,
-          totalPages: totalPages || Math.ceil(formattedAccounts.length / limit),
-          totalItems: totalItems || formattedAccounts.length,
-          itemsPerPage: limit
+          totalPages: estimatedTotalPages,
+          totalItems: formattedAccounts.length, // Current page count
+          itemsPerPage: limit,
+          hasNextPage,
+          hasPreviousPage
         }
       };
       

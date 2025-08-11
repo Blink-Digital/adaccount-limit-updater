@@ -75,5 +75,7 @@ export interface ApiResponse<T = any> {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
   };
 }

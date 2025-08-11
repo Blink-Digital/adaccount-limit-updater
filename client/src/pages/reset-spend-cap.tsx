@@ -217,7 +217,12 @@ export default function ResetSpendCap() {
   };
 
   const goToNextPage = () => {
-    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+    // Allow going to next page if we have exactly the limit (likely more pages)
+    const hasMoreData = inactiveAccounts?.pagination?.hasNextPage || 
+                       (currentAccounts.length === accountsPerPage);
+    if (hasMoreData) {
+      setCurrentPage(prev => prev + 1);
+    }
   };
 
   return (
@@ -385,10 +390,14 @@ export default function ResetSpendCap() {
                         {/* Pagination Header */}
                         <div className="flex items-center justify-between border-b border-gray-200 pb-4">
                           <div className="text-sm text-gray-700">
-                            Showing {((currentPage - 1) * accountsPerPage) + 1} to {Math.min(currentPage * accountsPerPage, totalAccounts)} of {totalAccounts} accounts
+                            Showing {currentAccounts.length} accounts on page {currentPage}
+                            {currentAccounts.length === accountsPerPage && (
+                              <span className="text-gray-500"> (likely more pages available)</span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">
-                            Page {currentPage} of {totalPages}
+                            Page {currentPage}
+                            {totalPages > currentPage && ` of ${totalPages}+`}
                           </div>
                         </div>
 
@@ -466,54 +475,29 @@ export default function ResetSpendCap() {
                         </div>
 
                         {/* Pagination Controls */}
-                        {totalPages > 1 && (
-                          <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
-                            <Button
-                              onClick={goToPreviousPage}
-                              disabled={currentPage === 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              Previous
-                            </Button>
-                            
-                            <div className="flex items-center space-x-1">
-                              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                                let pageNum;
-                                if (totalPages <= 5) {
-                                  pageNum = i + 1;
-                                } else if (currentPage <= 3) {
-                                  pageNum = i + 1;
-                                } else if (currentPage >= totalPages - 2) {
-                                  pageNum = totalPages - 4 + i;
-                                } else {
-                                  pageNum = currentPage - 2 + i;
-                                }
-                                
-                                return (
-                                  <Button
-                                    key={pageNum}
-                                    onClick={() => goToPage(pageNum)}
-                                    variant={currentPage === pageNum ? "default" : "outline"}
-                                    size="sm"
-                                    className="w-8 h-8 p-0"
-                                  >
-                                    {pageNum}
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                            
-                            <Button
-                              onClick={goToNextPage}
-                              disabled={currentPage === totalPages}
-                              variant="outline"
-                              size="sm"
-                            >
-                              Next
-                            </Button>
+                        <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
+                          <Button
+                            onClick={goToPreviousPage}
+                            disabled={currentPage === 1}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Previous
+                          </Button>
+                          
+                          <div className="flex items-center space-x-2 px-4">
+                            <span className="text-sm text-gray-700">Page {currentPage}</span>
                           </div>
-                        )}
+                          
+                          <Button
+                            onClick={goToNextPage}
+                            disabled={currentAccounts.length < accountsPerPage}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Next
+                          </Button>
+                        </div>
                       </>
                     )}
                   </div>
