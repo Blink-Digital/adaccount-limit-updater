@@ -66,7 +66,7 @@ export default function ResetSpendCap() {
   const [currentPage, setCurrentPage] = useState(1);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [previousCursor, setPreviousCursor] = useState<string | null>(null);
-  const accountsPerPage = 10;
+  const accountsPerPage = 20;
   const { toast } = useToast();
 
   // Form for fetching inactive accounts
