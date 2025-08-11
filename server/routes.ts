@@ -323,22 +323,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fetch ad accounts for a specific Business Manager with pagination and spending data  
+  // Get Business Manager accounts with pagination and optional spend data
   app.post("/api/facebook/business-manager-accounts", async (req, res) => {
     try {
-      const { accessToken, businessId, page, limit, after } = req.body;
+      const { accessToken, businessId, limit = 10, after, before, includeSpend = false } = businessManagerAccountsRequestSchema.parse(req.body);
       
-      // Use cursor-based pagination instead of offset
-      // Filter by active accounts (account_status=1) at Facebook API level
-      const filtering = JSON.stringify([{"field":"account_status","operator":"EQUAL","value":"1"}]);
-      let url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=${encodeURIComponent(filtering)}&limit=${limit}&access_token=${accessToken}`;
+      console.log(`[BM-ACCOUNTS] ${after ? `Using cursor pagination with after: ${after.substring(0, 20)}...` : 'Fetching first page (no cursor)'}`);
+      if (includeSpend) {
+        console.log(`[BM-ACCOUNTS] Including last month spend data`);
+      }
       
-      // Add cursor for pagination if provided
+      // Build URL with cursor-based pagination
+      let url = `https://graph.facebook.com/v21.0/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=[{"field":"account_status","operator":"EQUAL","value":"1"}]&limit=${limit}&access_token=${accessToken}`;
+      
       if (after) {
-        url += `&after=${encodeURIComponent(after)}`;
-        console.log(`[BM-ACCOUNTS] Using cursor pagination with after: ${after.substring(0, 20)}...`);
-      } else {
-        console.log(`[BM-ACCOUNTS] Fetching first page (no cursor)`);
+        url += `&after=${after}`;
+      } else if (before) {
+        url += `&before=${before}`;
       }
       
       const response = await fetch(url);
@@ -347,49 +348,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         const apiResponse: ApiResponse = {
           success: false,
-          error: data.error?.message || "Failed to fetch business manager accounts"
+          error: data.error?.message || "Failed to fetch Business Manager accounts"
         };
         return res.status(400).json(apiResponse);
       }
       
-      const accounts = data.data || [];
+      console.log(`[BM-ACCOUNTS] Retrieved ${data.data?.length || 0} active accounts from Facebook API`);
+      console.log(`[BM-ACCOUNTS] Facebook paging info:`, JSON.stringify(data.paging || {}));
       
-      // Transform accounts to consistent format - no filtering, just active accounts
-      const formattedAccounts = accounts.map((account: any) => ({
+      let accounts: InactiveAccount[] = (data.data || []).map((account: any) => ({
         id: account.id,
         name: account.name,
         spend_cap: account.spend_cap,
+        last_month_spend: 0, // Default value
         currency: account.currency || 'USD',
-        account_status: account.account_status
+        account_status: account.account_status?.toString() || '1'
       }));
       
-      console.log(`[BM-ACCOUNTS] Retrieved ${formattedAccounts.length} active accounts from Facebook API`);
-      console.log(`[BM-ACCOUNTS] Facebook paging info:`, data.paging ? JSON.stringify(data.paging) : 'No paging info');
+      // Fetch spend data if requested
+      if (includeSpend && accounts.length > 0) {
+        console.log(`[BM-ACCOUNTS] Fetching spend data for ${accounts.length} accounts...`);
+        
+        try {
+          // Get Business Manager level insights for last month
+          const insightsUrl = `https://graph.facebook.com/v21.0/${businessId}/insights?fields=spend,account_id&date_preset=last_month&level=account&access_token=${accessToken}`;
+          
+          const insightsResponse = await fetch(insightsUrl);
+          const insightsData = await insightsResponse.json();
+          
+          if (insightsResponse.ok && insightsData.data) {
+            console.log(`[BM-ACCOUNTS] Retrieved spend data for ${insightsData.data.length} accounts from Business Manager insights`);
+            
+            // Create a map of account_id to spend
+            const spendMap = new Map<string, number>();
+            insightsData.data.forEach((insight: any) => {
+              if (insight.account_id && insight.spend) {
+                // Remove 'act_' prefix if present to match account IDs
+                const accountId = insight.account_id.replace('act_', '');
+                spendMap.set(accountId, parseFloat(insight.spend) || 0);
+              }
+            });
+            
+            // Merge spend data with accounts
+            accounts = accounts.map(account => ({
+              ...account,
+              last_month_spend: spendMap.get(account.id) || 0
+            }));
+            
+            console.log(`[BM-ACCOUNTS] Successfully merged spend data for ${spendMap.size} accounts`);
+          } else {
+            console.warn(`[BM-ACCOUNTS] Failed to fetch Business Manager insights:`, insightsData.error?.message || 'Unknown error');
+          }
+        } catch (spendError) {
+          console.warn(`[BM-ACCOUNTS] Error fetching spend data:`, spendError);
+          // Continue without spend data - accounts will have default 0 values
+        }
+      }
       
-      // Extract cursor information from Facebook's response
-      const nextCursor = data.paging?.cursors?.after || null;
-      const previousCursor = data.paging?.cursors?.before || null;
-      const hasNextPage = !!data.paging?.next;
-      const hasPreviousPage = !!data.paging?.previous;
-      
-      const apiResponse: ApiResponse<any[]> = {
+      const apiResponse: ApiResponse<InactiveAccount[]> = {
         success: true,
-        data: formattedAccounts,
-        message: "Active accounts fetched successfully",
+        data: accounts,
         pagination: {
-          currentPage: page || 1,
-          totalPages: hasNextPage ? (page || 1) + 1 : (page || 1), // Estimate
-          totalItems: formattedAccounts.length, // Current page count
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: accounts.length,
           itemsPerPage: limit,
-          hasNextPage,
-          hasPreviousPage,
-          nextCursor,
-          previousCursor
+          hasNextPage: !!data.paging?.next,
+          hasPreviousPage: !!data.paging?.previous,
+          nextCursor: data.paging?.cursors?.after || null,
+          previousCursor: data.paging?.cursors?.before || null
         }
       };
       
       res.json(apiResponse);
     } catch (error: any) {
+      console.error("[BM-ACCOUNTS] Error:", error);
       const apiResponse: ApiResponse = {
         success: false,
         error: error.message || "Internal server error"

@@ -112,9 +112,12 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Recent Changes
 
-- **August 11, 2025**: **MAJOR SIMPLIFICATION**: Removed all server-side filtering for maximum speed and reliability
+- **August 11, 2025**: **SPEND DATA INTEGRATION**: Added Business Manager insights API for last month spend data
+- **August 11, 2025**: Implemented single-request approach using Facebook BM insights endpoint (`/{business-id}/insights`)
+- **August 11, 2025**: Added `includeSpend` parameter to backend API with graceful error handling
+- **August 11, 2025**: Enhanced UI with last month spend display in account cards (3-column layout)
+- **August 11, 2025**: **MAJOR SIMPLIFICATION**: Removed all server-side filtering for maximum speed and reliability  
 - **August 11, 2025**: Reset Caps page now shows all active accounts - users manually choose which to reset
-- **August 11, 2025**: Eliminated spending insights API calls - 10x+ performance improvement
 - **August 11, 2025**: Fixed pagination by using Facebook's native pagination instead of client-side filtering
 - **August 7, 2025**: **CONFIRMED**: Facebook Graph API does NOT support spend_cap filtering - server-side filtering is the only viable approach
 - **August 7, 2025**: Updated Facebook App ID from `426361686419846` to `1678172042635501` in Facebook SDK configuration
