@@ -378,7 +378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastMonthStart = lastMonth.toISOString().split('T')[0];
       const lastMonthEnd = new Date(thisMonth.getTime() - 1).toISOString().split('T')[0];
       
-      // Enrich filtered accounts with spending data
+      // Enrich filtered accounts with spending data and filter by zero spending
       const enrichedAccounts = [];
       for (const account of filteredAccounts) {
         try {
@@ -392,17 +392,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastMonthSpend = parseFloat(insightsData.data[0].spend || '0');
           }
           
-          enrichedAccounts.push({
-            id: account.id,
-            name: account.name,
-            spend_cap: account.spend_cap,
-            last_month_spend: lastMonthSpend,
-            currency: account.currency || 'USD',
-            account_status: account.account_status
-          });
+          // Filter for inactive accounts (zero spend last month) - SERVER-SIDE
+          if (lastMonthSpend === 0) {
+            console.log(`[BM-ACCOUNTS] Including INACTIVE account ${account.name} - last_month_spend: ${lastMonthSpend}`);
+            enrichedAccounts.push({
+              id: account.id,
+              name: account.name,
+              spend_cap: account.spend_cap,
+              last_month_spend: lastMonthSpend,
+              currency: account.currency || 'USD',
+              account_status: account.account_status
+            });
+          } else {
+            console.log(`[BM-ACCOUNTS] Filtering out ACTIVE account ${account.name} - last_month_spend: ${lastMonthSpend}`);
+          }
         } catch (error) {
           console.warn(`Failed to get insights for account ${account.id}:`, error);
-          // Include accounts where we can't get insights with 0 spend
+          // Include accounts where we can't get insights with 0 spend (assume inactive)
+          console.log(`[BM-ACCOUNTS] Including account ${account.name} - no insights data (assuming inactive)`);
           enrichedAccounts.push({
             id: account.id,
             name: account.name,
@@ -414,14 +421,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Update pagination to reflect filtered results
+      // Apply pagination to final filtered results  
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedAccounts = enrichedAccounts.slice(startIndex, endIndex);
+      
+      // Update pagination to reflect all inactive accounts found
       const totalItems = enrichedAccounts.length;
       const totalPages = Math.ceil(totalItems / limit);
       
       const apiResponse: ApiResponse<any[]> = {
         success: true,
-        data: enrichedAccounts,
-        message: "Business manager accounts fetched successfully with spending data",
+        data: paginatedAccounts,
+        message: "Inactive accounts fetched successfully with spending data",
         pagination: {
           currentPage: page,
           totalPages,

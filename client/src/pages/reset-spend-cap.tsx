@@ -108,37 +108,10 @@ export default function ResetSpendCap() {
         });
         const data = await response.json();
         
-        // Server already filters for active accounts with spend_cap > 1 unit
-        // Add additional client-side filtering as backup
+        // Server now handles all filtering (active accounts, spend_cap > 1, zero spending)
         if (data.success && data.data) {
-          console.log(`[FRONTEND] Received ${data.data.length} accounts from server after spend_cap > 1 filtering`);
-          const inactiveAccounts = data.data.filter((account: any) => {
-            // Double-check spend cap filtering client-side as backup
-            const spendCap = parseFloat(account.spend_cap || '0');
-            if (spendCap <= 1) {
-              console.log(`[FRONTEND] CLIENT-SIDE FILTERING OUT ${account.name} - spend_cap too low: ${account.spend_cap}`);
-              return false;
-            }
-            
-            const hasZeroSpend = account.last_month_spend === 0;
-            if (!hasZeroSpend) {
-              console.log(`[FRONTEND] Filtering out ${account.name} - has spending: ${account.last_month_spend}`);
-            } else {
-              console.log(`[FRONTEND] Including ${account.name} - spend_cap: ${account.spend_cap}, last_month_spend: ${account.last_month_spend}`);
-            }
-            return hasZeroSpend;
-          });
-          
-          return {
-            success: true,
-            data: inactiveAccounts,
-            pagination: {
-              currentPage: currentPage,
-              totalPages: Math.ceil(inactiveAccounts.length / accountsPerPage),
-              totalItems: inactiveAccounts.length,
-              itemsPerPage: accountsPerPage
-            }
-          };
+          console.log(`[FRONTEND] Received ${data.data.length} inactive accounts from server after all filtering`);
+          // Server-side filtering is complete, just return the data with proper pagination
         }
         return data;
       } else {
