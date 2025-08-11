@@ -4,7 +4,7 @@
 
 This is a full-stack web application built for managing Facebook ad accounts, specifically for viewing and updating spending caps. The application features a React frontend with shadcn/ui components and an Express.js backend that interfaces with the Facebook Graph API.
 
-**Current Status**: Fully functional interface with proper spend cap conversion handling. Users can fetch account details and update spend caps with correct dollar-to-API value conversion.
+**Current Status**: Ultra-fast interface optimized for speed and reliability. Users can quickly view all active ad accounts and reset spend caps as needed. No complex filtering - maximum performance.
 
 ## User Preferences
 
@@ -112,10 +112,33 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Recent Changes
 
+- **August 11, 2025**: **SPEND REFRESH FIX**: Prevent unnecessary spend data refresh for all accounts when updating single spend_cap - only refresh on new account IDs
+- **August 11, 2025**: **UI STATE UPDATE**: Implemented Option 3 - update local state from API response for instant spend cap refresh
+- **August 11, 2025**: **CURRENCY CONVERSION FIX**: Fixed spend_cap display showing $100 instead of $1 - Facebook returns cents, we convert to dollars
+- **August 11, 2025**: **FRONTEND SPEND LOADING**: Implemented Option A - auto-load individual account spend data from frontend
+- **August 11, 2025**: **SPEND CAP COLUMN**: Added spend cap display as 4th column in reset caps table
+- **August 11, 2025**: **PAGINATION UPDATE**: Increased items per page from 10 to 20 for better user experience
+- **August 11, 2025**: **SPEND DATA INTEGRATION**: Added Business Manager insights API for last month spend data
+- **August 11, 2025**: Implemented single-request approach using Facebook BM insights endpoint (`/{business-id}/insights`)
+- **August 11, 2025**: Added `includeSpend` parameter to backend API with graceful error handling
+- **August 11, 2025**: Enhanced UI with last month spend display in account cards (3-column layout)
+- **August 11, 2025**: **MAJOR SIMPLIFICATION**: Removed all server-side filtering for maximum speed and reliability  
+- **August 11, 2025**: Reset Caps page now shows all active accounts - users manually choose which to reset
+- **August 11, 2025**: Fixed pagination by using Facebook's native pagination instead of client-side filtering
+- **August 7, 2025**: **CONFIRMED**: Facebook Graph API does NOT support spend_cap filtering - server-side filtering is the only viable approach
 - **August 7, 2025**: Updated Facebook App ID from `426361686419846` to `1678172042635501` in Facebook SDK configuration
-- **August 7, 2025**: Fixed Business Manager filtering issue on Reset page - updated filtering logic to use `last_month_spend === 0`
-- **August 7, 2025**: Enhanced Business Manager accounts API to include spending insights data for proper inactive account filtering
-- **January 30, 2025**: Fixed critical spend cap conversion bug - Facebook API expects dollar values, not cents
-- **January 30, 2025**: Updated default ad account ID to act_1003491274360037 per user preference
+
+## API Filtering Capabilities (Tested August 7, 2025)
+
+**✅ Supported by Facebook Graph API:**
+- `account_status` filtering (implemented)
+- Date-based filtering  
+- Campaign/ad-level filtering
+
+**❌ NOT Supported by Facebook Graph API:**
+- `spend_cap` filtering (Error: "#100 Filtering field 'spend_cap' with operation 'greater_than' is not supported")
+- Custom spend limit filtering
+
+**Current Architecture Decision**: Prioritize speed and reliability over automation. Fetch only active accounts (`account_status=1`) with minimal processing. Users manually review and reset accounts as needed. This provides the fastest, most reliable experience.
 
 The application is designed for easy development in Replit while maintaining production-ready architecture patterns. The modular structure allows for easy extension of Facebook API features and database operations.

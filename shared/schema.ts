@@ -37,7 +37,10 @@ export const businessManagerAccountsRequestSchema = z.object({
   accessToken: z.string().min(1, "Access token is required"),
   businessId: z.string().min(1, "Business ID is required"),
   page: z.number().min(1).default(1),
-  limit: z.number().min(1).max(100).default(20)
+  limit: z.number().min(1).max(100).default(20),
+  after: z.string().optional(), // Facebook cursor for next page
+  before: z.string().optional(), // Facebook cursor for previous page
+  includeSpend: z.boolean().default(false) // Whether to include spend data
 });
 
 export const businessManagerSchema = z.object({
@@ -50,7 +53,7 @@ export const inactiveAccountSchema = z.object({
   id: z.string(),
   name: z.string(),
   spend_cap: z.number().nullable(),
-  last_month_spend: z.number(),
+  last_month_spend: z.number().default(0),
   currency: z.string(),
   account_status: z.string(),
 });
@@ -75,5 +78,9 @@ export interface ApiResponse<T = any> {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
+    nextCursor?: string | null;
+    previousCursor?: string | null;
   };
 }

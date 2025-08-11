@@ -115,8 +115,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { accessToken, page = 1, limit = 20 } = inactiveAccountsRequestSchema.parse(req.body);
       
-      // Get all ad accounts for the user
-      const accountsUrl = `https://graph.facebook.com/me/adaccounts?fields=id,name,spend_cap,account_status,currency&access_token=${accessToken}`;
+      // Get all active ad accounts for the user (filter by account_status=1 at Facebook API level)
+      const filtering = JSON.stringify([{"field":"account_status","operator":"EQUAL","value":"1"}]);
+      const accountsUrl = `https://graph.facebook.com/me/adaccounts?fields=id,name,spend_cap,account_status,currency&filtering=${encodeURIComponent(filtering)}&limit=1000&access_token=${accessToken}`;
       const accountsResponse = await fetch(accountsUrl);
       const accountsData = await accountsResponse.json();
       
@@ -138,8 +139,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allInactiveAccounts: InactiveAccount[] = [];
 
-      // Check spending for each account
-      for (const account of accountsData.data) {
+      // Filter accounts: spend_cap > 1 unit in their currency, excluding zero/null spend caps
+      // (Active accounts already filtered at Facebook API level)
+      const filteredAccounts = accountsData.data.filter((account: any) => {
+        
+        // Exclude accounts with zero or null spend_cap
+        if (!account.spend_cap || account.spend_cap === '0' || account.spend_cap === null) {
+          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} - zero/null spend_cap: ${account.spend_cap}`);
+          return false;
+        }
+        
+        // Parse spend cap and ensure it's above 1 unit in their currency
+        const spendCapStr = String(account.spend_cap).trim();
+        const spendCap = parseFloat(spendCapStr);
+        
+        // Strict filtering: exclude accounts with spend_cap = 1 or less
+        if (isNaN(spendCap) || spendCap <= 1 || spendCapStr === '1' || spendCapStr === '1.0' || spendCapStr === '1.00') {
+          console.log(`[INACTIVE-ACCOUNTS] Filtering out account ${account.name} - spend_cap not above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
+          return false;
+        }
+        
+        console.log(`[INACTIVE-ACCOUNTS] Including account ${account.name} - spend_cap above 1: original="${account.spend_cap}" parsed=${spendCap} currency=${account.currency}`);
+        
+        return true;
+      });
+
+      // Check spending for each filtered account
+      for (const account of filteredAccounts) {
         try {
           // Get insights for last month
           const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={'since':'${since}','until':'${until}'}&access_token=${accessToken}`;
@@ -243,7 +269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           id: updatedData.id,
           name: updatedData.name,
-          spend_cap: updatedData.spend_cap
+          spend_cap: updatedData.spend_cap,
+          currency: updatedData.currency || 'USD'
         },
         message: "Spend cap set to $1 successfully"
       };
@@ -297,13 +324,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fetch ad accounts for a specific Business Manager with pagination and spending data  
+  // Get Business Manager accounts with pagination and optional spend data
   app.post("/api/facebook/business-manager-accounts", async (req, res) => {
     try {
-      const { accessToken, businessId, page, limit } = businessManagerAccountsRequestSchema.parse(req.body);
+      const { accessToken, businessId, limit = 10, after, before, includeSpend = false } = businessManagerAccountsRequestSchema.parse(req.body);
       
-      const offset = (page - 1) * limit;
-      const url = `https://graph.facebook.com/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&limit=${limit}&offset=${offset}&access_token=${accessToken}`;
+      console.log(`[BM-ACCOUNTS] ${after ? `Using cursor pagination with after: ${after.substring(0, 20)}...` : 'Fetching first page (no cursor)'}`);
+      if (includeSpend) {
+        console.log(`[BM-ACCOUNTS] Including last month spend data`);
+      }
+      
+      // Build URL with cursor-based pagination
+      let url = `https://graph.facebook.com/v21.0/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=[{"field":"account_status","operator":"EQUAL","value":"1"}]&limit=${limit}&access_token=${accessToken}`;
+      
+      if (after) {
+        url += `&after=${after}`;
+      } else if (before) {
+        url += `&before=${before}`;
+      }
       
       const response = await fetch(url);
       const data = await response.json();
@@ -311,69 +349,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         const apiResponse: ApiResponse = {
           success: false,
-          error: data.error?.message || "Failed to fetch business manager accounts"
+          error: data.error?.message || "Failed to fetch Business Manager accounts"
         };
         return res.status(400).json(apiResponse);
       }
       
-      const accounts = data.data || [];
+      console.log(`[BM-ACCOUNTS] Retrieved ${data.data?.length || 0} active accounts from Facebook API`);
+      console.log(`[BM-ACCOUNTS] Facebook paging info:`, JSON.stringify(data.paging || {}));
       
-      // Get last month's date range
-      const now = new Date();
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastMonthStart = lastMonth.toISOString().split('T')[0];
-      const lastMonthEnd = new Date(thisMonth.getTime() - 1).toISOString().split('T')[0];
+      let accounts: InactiveAccount[] = (data.data || []).map((account: any) => ({
+        id: account.id,
+        name: account.name,
+        spend_cap: account.spend_cap,
+        last_month_spend: 0, // Default value
+        currency: account.currency || 'USD',
+        account_status: account.account_status?.toString() || '1'
+      }));
       
-      // Enrich accounts with spending data
-      const enrichedAccounts = [];
-      for (const account of accounts) {
-        try {
-          // Get insights for last month
-          const insightsUrl = `https://graph.facebook.com/${account.id}/insights?fields=spend&time_range={"since":"${lastMonthStart}","until":"${lastMonthEnd}"}&access_token=${accessToken}`;
-          const insightsResponse = await fetch(insightsUrl);
-          const insightsData = await insightsResponse.json();
-          
-          let lastMonthSpend = 0;
-          if (insightsData.data && insightsData.data.length > 0) {
-            lastMonthSpend = parseFloat(insightsData.data[0].spend || '0');
-          }
-          
-          enrichedAccounts.push({
-            id: account.id,
-            name: account.name,
-            spend_cap: account.spend_cap,
-            last_month_spend: lastMonthSpend,
-            currency: account.currency || 'USD',
-            account_status: account.account_status
-          });
-        } catch (error) {
-          console.warn(`Failed to get insights for account ${account.id}:`, error);
-          // Include accounts where we can't get insights with 0 spend
-          enrichedAccounts.push({
-            id: account.id,
-            name: account.name,
-            spend_cap: account.spend_cap,
-            last_month_spend: 0,
-            currency: account.currency || 'USD',
-            account_status: account.account_status
-          });
-        }
+      // Note: Business Manager insights endpoint doesn't exist
+      // Individual account spend data will be fetched from frontend
+      if (includeSpend && accounts.length > 0) {
+        console.log(`[BM-ACCOUNTS] Fetching spend data for ${accounts.length} accounts...`);
+        
+        console.log('[BM-ACCOUNTS] Skipping spend data - will be loaded individually from frontend');
       }
       
-      const totalItems = data.paging?.total_count || enrichedAccounts.length;
-      const totalPages = Math.ceil(totalItems / limit);
-      
-      const apiResponse: ApiResponse<any[]> = {
+      const apiResponse: ApiResponse<InactiveAccount[]> = {
         success: true,
-        data: enrichedAccounts,
-        message: "Business manager accounts fetched successfully with spending data",
+        data: accounts,
         pagination: {
-          currentPage: page,
-          totalPages,
-          totalItems,
-          itemsPerPage: limit
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: accounts.length,
+          itemsPerPage: limit,
+          hasNextPage: !!data.paging?.next,
+          hasPreviousPage: !!data.paging?.previous,
+          nextCursor: data.paging?.cursors?.after || null,
+          previousCursor: data.paging?.cursors?.before || null
         }
+      };
+      
+      res.json(apiResponse);
+    } catch (error: any) {
+      console.error("[BM-ACCOUNTS] Error:", error);
+      const apiResponse: ApiResponse = {
+        success: false,
+        error: error.message || "Internal server error"
+      };
+      res.status(500).json(apiResponse);
+    }
+  });
+
+  // Fetch individual ad account spend data
+  app.post("/api/facebook/account-spend", async (req, res) => {
+    try {
+      const { accessToken, accountId, datePreset = 'last_month' } = req.body;
+      
+      if (!accessToken || !accountId) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing accessToken or accountId"
+        });
+      }
+      
+      // Add 'act_' prefix if not present
+      const formattedAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
+      
+      const url = `https://graph.facebook.com/v21.0/${formattedAccountId}/insights?fields=spend&date_preset=${datePreset}&access_token=${accessToken}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const apiResponse: ApiResponse = {
+          success: false,
+          error: data.error?.message || "Failed to fetch account spend"
+        };
+        return res.status(400).json(apiResponse);
+      }
+      
+      // Extract spend value from response
+      const spend = data.data?.[0]?.spend ? parseFloat(data.data[0].spend) : 0;
+      
+      const apiResponse: ApiResponse<{ spend: number }> = {
+        success: true,
+        data: { spend },
+        message: "Account spend fetched successfully"
       };
       
       res.json(apiResponse);
