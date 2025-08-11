@@ -112,6 +112,7 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Recent Changes
 
+- **August 11, 2025**: **SPEND CAP COLUMN**: Added spend cap display as 4th column in reset caps table
 - **August 11, 2025**: **PAGINATION UPDATE**: Increased items per page from 10 to 20 for better user experience
 - **August 11, 2025**: **SPEND DATA INTEGRATION**: Added Business Manager insights API for last month spend data
 - **August 11, 2025**: Implemented single-request approach using Facebook BM insights endpoint (`/{business-id}/insights`)

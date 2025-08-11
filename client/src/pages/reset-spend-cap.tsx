@@ -481,7 +481,7 @@ export default function ResetSpendCap() {
                                     <p className="text-sm text-gray-500">{account.id}</p>
                                   </div>
                                 </div>
-                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
                                   <div>
                                     <span className="text-gray-500">Currency:</span>
                                     <div className="font-medium">{account.currency}</div>
@@ -490,6 +490,15 @@ export default function ResetSpendCap() {
                                     <span className="text-gray-500">Last Month Spend:</span>
                                     <div className="font-medium text-blue-600">
                                       {formatCurrency(account.last_month_spend || 0, account.currency)}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Spend Cap:</span>
+                                    <div className="font-medium text-green-600">
+                                      {account.spend_cap 
+                                        ? formatCurrency(account.spend_cap, account.currency)
+                                        : "No Limit"
+                                      }
                                     </div>
                                   </div>
                                   <div>
