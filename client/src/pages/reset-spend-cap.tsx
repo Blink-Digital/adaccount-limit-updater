@@ -227,6 +227,20 @@ export default function ResetSpendCap() {
       const account = currentAccounts.find((acc: InactiveAccount) => acc.id === variables.accountId);
       const currencyDisplay = account ? formatCurrencyForSetCap(account.currency) : '$1';
       
+      // Update local state with the fresh spend_cap data from Facebook API
+      if (response.data && accountsData?.data) {
+        const updatedAccounts = accountsData.data.map((acc: InactiveAccount) => 
+          acc.id === variables.accountId 
+            ? { ...acc, spend_cap: response.data.spend_cap }
+            : acc
+        );
+        
+        setAccountsData(prev => ({
+          ...prev,
+          data: updatedAccounts
+        }));
+      }
+      
       // Add account to processed accounts set
       setProcessedAccounts(prev => new Set(prev).add(variables.accountId));
       
@@ -235,7 +249,6 @@ export default function ResetSpendCap() {
         description: `Spend cap set to ${currencyDisplay} successfully`
       });
       setProcessingAccountId(null);
-      // Don't refetch - keep optimistic UI state
     },
     onError: (error: any) => {
       toast({

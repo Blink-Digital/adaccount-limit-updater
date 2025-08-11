@@ -269,7 +269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           id: updatedData.id,
           name: updatedData.name,
-          spend_cap: updatedData.spend_cap
+          spend_cap: updatedData.spend_cap,
+          currency: updatedData.currency || 'USD'
         },
         message: "Spend cap set to $1 successfully"
       };

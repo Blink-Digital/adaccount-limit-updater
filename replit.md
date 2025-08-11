@@ -112,6 +112,7 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Recent Changes
 
+- **August 11, 2025**: **UI STATE UPDATE**: Implemented Option 3 - update local state from API response for instant spend cap refresh
 - **August 11, 2025**: **CURRENCY CONVERSION FIX**: Fixed spend_cap display showing $100 instead of $1 - Facebook returns cents, we convert to dollars
 - **August 11, 2025**: **FRONTEND SPEND LOADING**: Implemented Option A - auto-load individual account spend data from frontend
 - **August 11, 2025**: **SPEND CAP COLUMN**: Added spend cap display as 4th column in reset caps table
