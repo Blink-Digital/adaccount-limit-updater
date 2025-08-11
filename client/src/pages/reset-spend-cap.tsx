@@ -282,6 +282,19 @@ export default function ResetSpendCap() {
     }).format(amount); // Facebook Insights API returns amounts in dollars
   };
 
+  const formatSpendCap = (spendCap: number | null, currency: string = 'USD') => {
+    if (spendCap === null || spendCap === undefined) return 'No limit';
+    
+    // Facebook API returns spend_cap in cents, so divide by 100 to get dollars
+    const amountInDollars = spendCap / 100;
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amountInDollars);
+  };
+
   const formatCurrencyForSetCap = (currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -565,10 +578,7 @@ export default function ResetSpendCap() {
                                   <div>
                                     <span className="text-gray-500">Spend Cap:</span>
                                     <div className="font-medium text-green-600">
-                                      {account.spend_cap 
-                                        ? formatCurrency(account.spend_cap, account.currency)
-                                        : "No Limit"
-                                      }
+                                      {formatSpendCap(account.spend_cap, account.currency)}
                                     </div>
                                   </div>
                                   <div>
