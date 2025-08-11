@@ -94,8 +94,9 @@ export default function ResetSpendCap() {
 
   // Query to fetch inactive accounts with pagination
   const { data: inactiveAccounts, isLoading, error, refetch } = useQuery({
-    queryKey: ['/api/facebook/inactive-accounts', accessToken, currentPage, selectedBusinessId],
+    queryKey: ['business-manager-accounts', selectedBusinessId, currentPage, accessToken],
     queryFn: async () => {
+      console.log(`[QUERY] Fetching page ${currentPage} for BM ${selectedBusinessId}`);
       if (!accessToken) return null;
       
       // If BM is selected, fetch from that BM, otherwise use old endpoint
@@ -110,7 +111,7 @@ export default function ResetSpendCap() {
         
         // Server now handles all filtering (active accounts, spend_cap > 1, zero spending)
         if (data.success && data.data) {
-          console.log(`[FRONTEND] Received ${data.data.length} inactive accounts from server after all filtering`);
+          console.log(`[FRONTEND] Received ${data.data.length} accounts from server for page ${currentPage}`);
           // Server-side filtering is complete, just return the data with proper pagination
         }
         return data;
@@ -123,7 +124,9 @@ export default function ResetSpendCap() {
         return response.json();
       }
     },
-    enabled: !!accessToken
+    enabled: !!accessToken && !!selectedBusinessId,
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 1000 * 60 * 5 // Cache for 5 minutes
   });
 
   // Mutation to set spend cap to $1 for an account
@@ -177,6 +180,7 @@ export default function ResetSpendCap() {
   };
 
   const handleBusinessManagerChange = (businessId: string) => {
+    console.log(`[BM-CHANGE] Changing Business Manager to: ${businessId}`);
     setSelectedBusinessId(businessId);
     setCurrentPage(1); // Reset to first page when changing BM
   };
@@ -209,10 +213,12 @@ export default function ResetSpendCap() {
   const currentAccounts = inactiveAccounts?.data || [];
 
   const goToPage = (page: number) => {
+    console.log(`[PAGINATION] Going to page ${page}`);
     setCurrentPage(page);
   };
 
   const goToPreviousPage = () => {
+    console.log(`[PAGINATION] Going to previous page from ${currentPage}`);
     setCurrentPage(prev => Math.max(1, prev - 1));
   };
 
@@ -220,8 +226,12 @@ export default function ResetSpendCap() {
     // Allow going to next page if we have exactly the limit (likely more pages)
     const hasMoreData = inactiveAccounts?.pagination?.hasNextPage || 
                        (currentAccounts.length === accountsPerPage);
+    console.log(`[PAGINATION] Next page clicked. Current accounts: ${currentAccounts.length}, hasMoreData: ${hasMoreData}`);
     if (hasMoreData) {
-      setCurrentPage(prev => prev + 1);
+      setCurrentPage(prev => {
+        console.log(`[PAGINATION] Changing page from ${prev} to ${prev + 1}`);
+        return prev + 1;
+      });
     }
   };
 
