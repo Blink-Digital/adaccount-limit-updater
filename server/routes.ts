@@ -365,44 +365,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         account_status: account.account_status?.toString() || '1'
       }));
       
-      // Fetch spend data if requested
+      // Note: Business Manager insights endpoint doesn't exist
+      // Individual account spend data will be fetched from frontend
       if (includeSpend && accounts.length > 0) {
         console.log(`[BM-ACCOUNTS] Fetching spend data for ${accounts.length} accounts...`);
         
-        try {
-          // Get Business Manager level insights for last month
-          const insightsUrl = `https://graph.facebook.com/v21.0/${businessId}/insights?fields=spend,account_id&date_preset=last_month&level=account&access_token=${accessToken}`;
-          
-          const insightsResponse = await fetch(insightsUrl);
-          const insightsData = await insightsResponse.json();
-          
-          if (insightsResponse.ok && insightsData.data) {
-            console.log(`[BM-ACCOUNTS] Retrieved spend data for ${insightsData.data.length} accounts from Business Manager insights`);
-            
-            // Create a map of account_id to spend
-            const spendMap = new Map<string, number>();
-            insightsData.data.forEach((insight: any) => {
-              if (insight.account_id && insight.spend) {
-                // Remove 'act_' prefix if present to match account IDs
-                const accountId = insight.account_id.replace('act_', '');
-                spendMap.set(accountId, parseFloat(insight.spend) || 0);
-              }
-            });
-            
-            // Merge spend data with accounts
-            accounts = accounts.map(account => ({
-              ...account,
-              last_month_spend: spendMap.get(account.id) || 0
-            }));
-            
-            console.log(`[BM-ACCOUNTS] Successfully merged spend data for ${spendMap.size} accounts`);
-          } else {
-            console.warn(`[BM-ACCOUNTS] Failed to fetch Business Manager insights:`, insightsData.error?.message || 'Unknown error');
-          }
-        } catch (spendError) {
-          console.warn(`[BM-ACCOUNTS] Error fetching spend data:`, spendError);
-          // Continue without spend data - accounts will have default 0 values
-        }
+        console.log('[BM-ACCOUNTS] Skipping spend data - will be loaded individually from frontend');
       }
       
       const apiResponse: ApiResponse<InactiveAccount[]> = {
@@ -423,6 +391,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(apiResponse);
     } catch (error: any) {
       console.error("[BM-ACCOUNTS] Error:", error);
+      const apiResponse: ApiResponse = {
+        success: false,
+        error: error.message || "Internal server error"
+      };
+      res.status(500).json(apiResponse);
+    }
+  });
+
+  // Fetch individual ad account spend data
+  app.post("/api/facebook/account-spend", async (req, res) => {
+    try {
+      const { accessToken, accountId, datePreset = 'last_month' } = req.body;
+      
+      if (!accessToken || !accountId) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing accessToken or accountId"
+        });
+      }
+      
+      // Add 'act_' prefix if not present
+      const formattedAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
+      
+      const url = `https://graph.facebook.com/v21.0/${formattedAccountId}/insights?fields=spend&date_preset=${datePreset}&access_token=${accessToken}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const apiResponse: ApiResponse = {
+          success: false,
+          error: data.error?.message || "Failed to fetch account spend"
+        };
+        return res.status(400).json(apiResponse);
+      }
+      
+      // Extract spend value from response
+      const spend = data.data?.[0]?.spend ? parseFloat(data.data[0].spend) : 0;
+      
+      const apiResponse: ApiResponse<{ spend: number }> = {
+        success: true,
+        data: { spend },
+        message: "Account spend fetched successfully"
+      };
+      
+      res.json(apiResponse);
+    } catch (error: any) {
       const apiResponse: ApiResponse = {
         success: false,
         error: error.message || "Internal server error"

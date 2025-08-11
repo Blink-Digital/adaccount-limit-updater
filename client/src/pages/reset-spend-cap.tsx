@@ -56,6 +56,14 @@ interface InactiveAccount {
   account_status: string;
 }
 
+interface AccountSpendState {
+  [accountId: string]: {
+    spend: number;
+    loading: boolean;
+    error: string | null;
+  };
+}
+
 export default function ResetSpendCap() {
   const [showToken, setShowToken] = useState(false);
   const [accessToken, setAccessToken] = useState("");
@@ -98,6 +106,59 @@ export default function ResetSpendCap() {
   const [isManualLoading, setIsManualLoading] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
   const [accountsData, setAccountsData] = useState<any>(null);
+  const [accountSpends, setAccountSpends] = useState<AccountSpendState>({});
+
+  // Function to fetch spend data for individual account
+  const fetchAccountSpend = async (accountId: string) => {
+    try {
+      // Set loading state
+      setAccountSpends(prev => ({
+        ...prev,
+        [accountId]: { spend: 0, loading: true, error: null }
+      }));
+
+      const response = await apiRequest("POST", "/api/facebook/account-spend", {
+        accessToken,
+        accountId,
+        datePreset: 'last_month'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setAccountSpends(prev => ({
+          ...prev,
+          [accountId]: { spend: data.data.spend, loading: false, error: null }
+        }));
+      } else {
+        setAccountSpends(prev => ({
+          ...prev,
+          [accountId]: { spend: 0, loading: false, error: data.error || 'Failed to fetch spend' }
+        }));
+      }
+    } catch (error) {
+      setAccountSpends(prev => ({
+        ...prev,
+        [accountId]: { spend: 0, loading: false, error: 'Network error' }
+      }));
+    }
+  };
+
+  // Auto-load spend data for all accounts when they're loaded
+  useEffect(() => {
+    if (accountsData?.data && accessToken) {
+      const accounts = accountsData.data;
+      console.log(`[SPEND-LOADER] Auto-loading spend data for ${accounts.length} accounts`);
+      
+      // Clear previous spend data
+      setAccountSpends({});
+      
+      // Fetch spend for all accounts
+      accounts.forEach((account: InactiveAccount) => {
+        fetchAccountSpend(account.id);
+      });
+    }
+  }, [accountsData?.data, accessToken]);
 
   // Manual fetch function
   const fetchAccountsManually = async (cursor?: string | null) => {
@@ -489,7 +550,16 @@ export default function ResetSpendCap() {
                                   <div>
                                     <span className="text-gray-500">Last Month Spend:</span>
                                     <div className="font-medium text-blue-600">
-                                      {formatCurrency(account.last_month_spend || 0, account.currency)}
+                                      {accountSpends[account.id]?.loading ? (
+                                        <div className="flex items-center space-x-2">
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          <span>Loading...</span>
+                                        </div>
+                                      ) : accountSpends[account.id]?.error ? (
+                                        <span className="text-red-500 text-xs">Unable to load</span>
+                                      ) : (
+                                        formatCurrency(accountSpends[account.id]?.spend || 0, account.currency)
+                                      )}
                                     </div>
                                   </div>
                                   <div>
