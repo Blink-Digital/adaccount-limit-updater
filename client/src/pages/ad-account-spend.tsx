@@ -85,6 +85,8 @@ export default function AdAccountSpend() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [previousCursor, setPreviousCursor] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
+  const [isSearching, setIsSearching] = useState(false);
   const accountsPerPage = 20;
   const { toast } = useToast();
 
@@ -313,20 +315,14 @@ export default function AdAccountSpend() {
     }).format(amount); // Facebook Insights API returns amounts in dollars
   };
 
-  // Debounced search function to avoid too many API calls
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
-  const [isSearching, setIsSearching] = useState(false);
-
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (debouncedSearchQuery !== searchQuery) {
-        setDebouncedSearchQuery(searchQuery);
-      }
+      setDebouncedSearchQuery(searchQuery);
     }, 500); // 500ms delay
 
     return () => clearTimeout(timer);
-  }, [searchQuery, debouncedSearchQuery]);
+  }, [searchQuery]);
 
   // Get pagination info from API response
   const pagination = spendAccounts?.pagination;
@@ -544,7 +540,7 @@ export default function AdAccountSpend() {
                       <AlertTriangle className="h-5 w-5 text-red-600 mt-1" />
                       <div>
                         <h3 className="text-sm font-medium text-red-800">Error</h3>
-                        <p className="text-sm text-red-700 mt-1">{typeof error === 'string' ? error : error?.message}</p>
+                        <p className="text-sm text-red-700 mt-1">{typeof error === 'string' ? error : 'An error occurred'}</p>
                       </div>
                     </div>
                   </div>
