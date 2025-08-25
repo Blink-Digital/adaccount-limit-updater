@@ -572,11 +572,15 @@ export default function AdAccountSpend() {
                                     setCustomEndDate(date);
                                     setEndDateOpen(false);
                                   }}
-                                  disabled={(date) => 
-                                    date > new Date() || 
-                                    date < new Date("1900-01-01") ||
-                                    (customStartDate && date < customStartDate)
-                                  }
+                                  disabled={(date) => {
+                                    if (date > new Date() || date < new Date("1900-01-01")) {
+                                      return true;
+                                    }
+                                    if (customStartDate && date < customStartDate) {
+                                      return true;
+                                    }
+                                    return false;
+                                  }}
                                   initialFocus
                                 />
                               </PopoverContent>
