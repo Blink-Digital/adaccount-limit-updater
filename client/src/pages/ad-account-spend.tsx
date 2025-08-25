@@ -548,87 +548,94 @@ export default function AdAccountSpend() {
 
                 {spendAccounts?.success && spendAccounts.data && (
                   <div className="space-y-4">
+                    {/* Search Bar - Always Visible */}
+                    <div className="space-y-4 border-b border-gray-200 pb-4">
+                      {/* Search Bar */}
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-1">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                              type="text"
+                              placeholder="Search by account name or ID..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-10 pr-10"
+                            />
+                            {searchQuery && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                                onClick={() => setSearchQuery("")}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {(searchQuery || isSearching) && (
+                          <div className="text-sm text-gray-600">
+                            {isSearching ? (
+                              <div className="flex items-center space-x-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Searching...</span>
+                              </div>
+                            ) : searchQuery ? (
+                              `Found ${currentAccounts.length} matching accounts`
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Pagination Info */}
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-700">
+                          {searchQuery ? (
+                            `Showing ${currentAccounts.length} search results`
+                          ) : (
+                            `Showing ${currentAccounts.length} accounts on page ${currentPage}`
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={goToPreviousPage}
+                            disabled={currentPage === 1 || isSearching}
+                          >
+                            Previous
+                          </Button>
+                          <span className="text-sm text-gray-500">
+                            {searchQuery ? "Search Results" : `Page ${currentPage}`}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={goToNextPage}
+                            disabled={!accountsData?.pagination?.hasNextPage || isSearching || !!searchQuery}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Results Section */}
                     {spendAccounts.data.length === 0 ? (
                       <div className="text-center py-8">
                         <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                         <h3 className="text-lg font-medium text-gray-900">No Accounts Found</h3>
-                        <p className="text-gray-600">No ad accounts found in this Business Manager.</p>
+                        <p className="text-gray-600">
+                          {searchQuery 
+                            ? `No accounts match your search "${searchQuery}". Try a different search term or clear the search to see all accounts.`
+                            : "No ad accounts found in this Business Manager."
+                          }
+                        </p>
                       </div>
                     ) : (
                       <>
-                        {/* Search and Pagination Header */}
-                        <div className="space-y-4 border-b border-gray-200 pb-4">
-                          {/* Search Bar */}
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-1">
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                <Input
-                                  type="text"
-                                  placeholder="Search by account name or ID..."
-                                  value={searchQuery}
-                                  onChange={(e) => setSearchQuery(e.target.value)}
-                                  className="pl-10 pr-10"
-                                />
-                                {searchQuery && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                                    onClick={() => setSearchQuery("")}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            {(searchQuery || isSearching) && (
-                              <div className="text-sm text-gray-600">
-                                {isSearching ? (
-                                  <div className="flex items-center space-x-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>Searching...</span>
-                                  </div>
-                                ) : searchQuery ? (
-                                  `Found ${currentAccounts.length} matching accounts`
-                                ) : null}
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Pagination Info */}
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-gray-700">
-                              {searchQuery ? (
-                                `Showing ${currentAccounts.length} search results`
-                              ) : (
-                                `Showing ${currentAccounts.length} accounts on page ${currentPage}`
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={goToPreviousPage}
-                                disabled={currentPage === 1 || isSearching}
-                              >
-                                Previous
-                              </Button>
-                              <span className="text-sm text-gray-500">
-                                {searchQuery ? "Search Results" : `Page ${currentPage}`}
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={goToNextPage}
-                                disabled={!accountsData?.pagination?.hasNextPage || isSearching || !!searchQuery}
-                              >
-                                Next
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
 
                         {/* Accounts Table */}
                         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
