@@ -37,21 +37,19 @@ import {
   RefreshCw, 
   AlertTriangle,
   Loader2,
-  DollarSign,
+  BarChart3,
   Calendar,
   Eye,
   EyeOff,
-  CheckCircle2
+  TrendingUp
 } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa";
 import { FacebookLoginButton } from "../components/FacebookLoginButton";
 import { Link } from "wouter";
 
-interface InactiveAccount {
+interface SpendAccount {
   id: string;
   name: string;
-  spend_cap: number | null;
-  last_month_spend: number;
   currency: string;
   account_status: string;
 }
@@ -64,20 +62,30 @@ interface AccountSpendState {
   };
 }
 
-export default function ResetSpendCap() {
+const DATE_PRESETS = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'last_7_days', label: 'Last 7 days' },
+  { value: 'last_30_days', label: 'Last 30 days' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_month', label: 'Last month' },
+  { value: 'this_quarter', label: 'This quarter' },
+  { value: 'lifetime', label: 'Lifetime' }
+];
+
+export default function AdAccountSpend() {
   const [showToken, setShowToken] = useState(false);
   const [accessToken, setAccessToken] = useState("");
-  const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
-  const [processedAccounts, setProcessedAccounts] = useState<Set<string>>(new Set());
   const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
+  const [selectedDatePreset, setSelectedDatePreset] = useState<string>("last_30_days");
   const [currentPage, setCurrentPage] = useState(1);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [previousCursor, setPreviousCursor] = useState<string | null>(null);
   const accountsPerPage = 20;
   const { toast } = useToast();
 
-  // Form for fetching inactive accounts
+  // Form for fetching accounts
   const form = useForm({
     resolver: zodResolver(fetchAccountRequestSchema.omit({ adAccountId: true })),
     defaultValues: {
@@ -109,7 +117,7 @@ export default function ResetSpendCap() {
   const [accountSpends, setAccountSpends] = useState<AccountSpendState>({});
 
   // Function to fetch spend data for individual account
-  const fetchAccountSpend = async (accountId: string) => {
+  const fetchAccountSpend = async (accountId: string, datePreset: string) => {
     try {
       // Set loading state
       setAccountSpends(prev => ({
@@ -120,7 +128,7 @@ export default function ResetSpendCap() {
       const response = await apiRequest("POST", "/api/facebook/account-spend", {
         accessToken,
         accountId,
-        datePreset: 'last_month'
+        datePreset
       });
       
       const data = await response.json();
@@ -147,24 +155,24 @@ export default function ResetSpendCap() {
   // Track account IDs to only fetch spend data when accounts actually change
   const [previousAccountIds, setPreviousAccountIds] = useState<string[]>([]);
 
-  // Auto-load spend data for all accounts when NEW accounts are loaded
+  // Auto-load spend data for all accounts when NEW accounts are loaded or date preset changes
   useEffect(() => {
-    if (accountsData?.data && accessToken) {
+    if (accountsData?.data && accessToken && selectedDatePreset) {
       const accounts = accountsData.data;
-      const currentAccountIds = accounts.map((acc: InactiveAccount) => acc.id);
+      const currentAccountIds = accounts.map((acc: SpendAccount) => acc.id);
       
       // Only fetch spend data if the actual account IDs changed (new accounts loaded)
       const idsChanged = JSON.stringify(currentAccountIds) !== JSON.stringify(previousAccountIds);
       
       if (idsChanged) {
-        console.log(`[SPEND-LOADER] New accounts loaded - auto-loading spend data for ${accounts.length} accounts`);
+        console.log(`[SPEND-LOADER] New accounts loaded - auto-loading spend data for ${accounts.length} accounts with preset: ${selectedDatePreset}`);
         
         // Clear previous spend data
         setAccountSpends({});
         
         // Fetch spend for all accounts
-        accounts.forEach((account: InactiveAccount) => {
-          fetchAccountSpend(account.id);
+        accounts.forEach((account: SpendAccount) => {
+          fetchAccountSpend(account.id, selectedDatePreset);
         });
         
         // Update tracked account IDs
@@ -173,7 +181,22 @@ export default function ResetSpendCap() {
         console.log(`[SPEND-LOADER] Account properties updated but IDs unchanged - skipping spend refresh`);
       }
     }
-  }, [accountsData?.data, accessToken, previousAccountIds]);
+  }, [accountsData?.data, accessToken, selectedDatePreset, previousAccountIds]);
+
+  // Refresh spend data when date preset changes (for existing accounts)
+  useEffect(() => {
+    if (accountsData?.data && accessToken && previousAccountIds.length > 0) {
+      console.log(`[DATE-CHANGE] Date preset changed to ${selectedDatePreset} - refreshing spend data`);
+      
+      // Clear previous spend data
+      setAccountSpends({});
+      
+      // Fetch spend for all accounts with new date preset
+      accountsData.data.forEach((account: SpendAccount) => {
+        fetchAccountSpend(account.id, selectedDatePreset);
+      });
+    }
+  }, [selectedDatePreset]);
 
   // Manual fetch function
   const fetchAccountsManually = async (cursor?: string | null) => {
@@ -188,7 +211,7 @@ export default function ResetSpendCap() {
         businessId: selectedBusinessId,
         page: currentPage, 
         limit: accountsPerPage,
-        includeSpend: true // Enable Business Manager insights for spend data
+        includeSpend: false // Don't need Business Manager insights for this page
       };
       
       if (cursor) {
@@ -223,57 +246,9 @@ export default function ResetSpendCap() {
   }, [accessToken, selectedBusinessId]);
 
   // Expose data in the expected format
-  const inactiveAccounts = accountsData;
+  const spendAccounts = accountsData;
   const isLoading = isManualLoading;
   const error = manualError;
-
-  // Mutation to set spend cap to $1 for an account
-  const resetSpendCapMutation = useMutation({
-    mutationFn: async ({ accountId }: { accountId: string }) => {
-      setProcessingAccountId(accountId);
-      const response = await apiRequest("POST", "/api/facebook/set-spend-cap-to-one", {
-        accessToken,
-        adAccountId: accountId
-      });
-      return response.json();
-    },
-    onSuccess: (response: any, variables: { accountId: string }) => {
-      // Find the account to get its currency
-      const account = currentAccounts.find((acc: InactiveAccount) => acc.id === variables.accountId);
-      const currencyDisplay = account ? formatCurrencyForSetCap(account.currency) : '$1';
-      
-      // Update local state with the fresh spend_cap data from Facebook API
-      if (response.data && accountsData?.data) {
-        const updatedAccounts = accountsData.data.map((acc: InactiveAccount) => 
-          acc.id === variables.accountId 
-            ? { ...acc, spend_cap: response.data.spend_cap }
-            : acc
-        );
-        
-        setAccountsData(prev => ({
-          ...prev,
-          data: updatedAccounts
-        }));
-      }
-      
-      // Add account to processed accounts set
-      setProcessedAccounts(prev => new Set(prev).add(variables.accountId));
-      
-      toast({
-        title: "Success",
-        description: `Spend cap set to ${currencyDisplay} successfully`
-      });
-      setProcessingAccountId(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to set spend cap",
-        variant: "destructive"
-      });
-      setProcessingAccountId(null);
-    }
-  });
 
   const onSubmit = (data: { accessToken: string }) => {
     setAccessToken(data.accessToken);
@@ -298,8 +273,9 @@ export default function ResetSpendCap() {
     setPreviousCursor(null);
   };
 
-  const handleResetSpendCap = (accountId: string) => {
-    resetSpendCapMutation.mutate({ accountId });
+  const handleDatePresetChange = (datePreset: string) => {
+    console.log(`[DATE-CHANGE] Changing date preset to: ${datePreset}`);
+    setSelectedDatePreset(datePreset);
   };
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
@@ -310,40 +286,11 @@ export default function ResetSpendCap() {
     }).format(amount); // Facebook Insights API returns amounts in dollars
   };
 
-  const formatSpendCap = (spendCap: number | null, currency: string = 'USD') => {
-    if (spendCap === null || spendCap === undefined) return 'No limit';
-    
-    // Facebook API returns spend_cap in cents, so divide by 100 to get dollars
-    const amountInDollars = spendCap / 100;
-    
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2
-    }).format(amountInDollars);
-  };
-
-  const formatCurrencyForSetCap = (currency: string = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(1);
-  };
-
   // Get pagination info from API response
-  const pagination = inactiveAccounts?.pagination;
+  const pagination = spendAccounts?.pagination;
   const totalAccounts = pagination?.totalItems || 0;
   const totalPages = pagination?.totalPages || 0;
-  const currentAccounts = inactiveAccounts?.data || [];
-
-  const goToPage = (page: number) => {
-    console.log(`[PAGINATION] Going to page ${page}`);
-    setCurrentPage(page);
-  };
-
-
+  const currentAccounts = spendAccounts?.data || [];
 
   const goToNextPage = () => {
     const hasNextPageData = accountsData?.pagination?.hasNextPage;
@@ -387,18 +334,18 @@ export default function ResetSpendCap() {
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-                <RefreshCw className="text-white text-sm" />
+              <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+                <BarChart3 className="text-white text-sm" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Reset Spend Caps</h1>
-                <p className="text-sm text-gray-600">Review active ad accounts and reset spend caps as needed</p>
+                <h1 className="text-xl font-semibold text-gray-900">Ad Account Spend</h1>
+                <p className="text-sm text-gray-600">View spending data across all ad accounts for any date range</p>
               </div>
             </div>
             <nav className="flex items-center space-x-4">
               <Link href="/" className="text-gray-600 hover:text-blue-600">Manage Caps</Link>
-              <Link href="/reset-spend-cap" className="text-red-600 font-medium">Reset Caps</Link>
-              <Link href="/ad-account-spend" className="text-gray-600 hover:text-blue-600">Account Spend</Link>
+              <Link href="/reset-spend-cap" className="text-gray-600 hover:text-blue-600">Reset Caps</Link>
+              <Link href="/ad-account-spend" className="text-green-600 font-medium">Account Spend</Link>
             </nav>
           </div>
         </div>
@@ -445,7 +392,7 @@ export default function ResetSpendCap() {
                           </div>
                         </FormControl>
                         <p className="text-xs text-gray-500">
-                          Required permissions: ads_read, ads_management
+                          Required permissions: ads_read, business_management
                         </p>
                         <FacebookLoginButton 
                           onTokenReceived={handleFacebookLogin}
@@ -475,10 +422,33 @@ export default function ResetSpendCap() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Choose which Business Manager to view inactive accounts from
+                        Choose which Business Manager to view accounts from
                       </p>
                     </div>
                   )}
+
+                  {/* Date Range Selection */}
+                  <div className="space-y-2">
+                    <Label>Date Range</Label>
+                    <Select 
+                      value={selectedDatePreset} 
+                      onValueChange={handleDatePresetChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Date Range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DATE_PRESETS.map((preset) => (
+                          <SelectItem key={preset.value} value={preset.value}>
+                            {preset.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Choose the time period for spend reporting
+                    </p>
+                  </div>
 
                   <Button 
                     type="submit" 
@@ -490,7 +460,7 @@ export default function ResetSpendCap() {
                     ) : (
                       <RefreshCw className="mr-2 h-4 w-4" />
                     )}
-                    Find Inactive Accounts
+                    Load Account Spend Data
                   </Button>
                 </form>
               </Form>
@@ -503,12 +473,17 @@ export default function ResetSpendCap() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Calendar className="h-5 w-5 text-blue-600" />
-                    <span>Active Ad Accounts</span>
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    <span>Account Spending Report</span>
+                    {selectedDatePreset && (
+                      <Badge variant="outline" className="bg-green-50 text-green-800">
+                        {DATE_PRESETS.find(p => p.value === selectedDatePreset)?.label}
+                      </Badge>
+                    )}
                   </div>
-                  {inactiveAccounts?.data && (
+                  {spendAccounts?.data && (
                     <Badge variant="secondary">
-                      {inactiveAccounts.data.length} accounts found
+                      {spendAccounts.data.length} accounts found
                     </Badge>
                   )}
                 </CardTitle>
@@ -517,7 +492,7 @@ export default function ResetSpendCap() {
                 {isLoading && (
                   <div className="text-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-                    <p className="text-sm text-gray-600 mt-2">Analyzing ad accounts...</p>
+                    <p className="text-sm text-gray-600 mt-2">Loading ad accounts...</p>
                   </div>
                 )}
 
@@ -533,13 +508,13 @@ export default function ResetSpendCap() {
                   </div>
                 )}
 
-                {inactiveAccounts?.success && inactiveAccounts.data && (
+                {spendAccounts?.success && spendAccounts.data && (
                   <div className="space-y-4">
-                    {inactiveAccounts.data.length === 0 ? (
+                    {spendAccounts.data.length === 0 ? (
                       <div className="text-center py-8">
-                        <DollarSign className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                        <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                         <h3 className="text-lg font-medium text-gray-900">No Accounts Found</h3>
-                        <p className="text-gray-600">No active ad accounts found in this Business Manager.</p>
+                        <p className="text-gray-600">No ad accounts found in this Business Manager.</p>
                       </div>
                     ) : (
                       <>
@@ -547,147 +522,73 @@ export default function ResetSpendCap() {
                         <div className="flex items-center justify-between border-b border-gray-200 pb-4">
                           <div className="text-sm text-gray-700">
                             Showing {currentAccounts.length} accounts on page {currentPage}
-                            {currentAccounts.length === accountsPerPage && (
-                              <span className="text-gray-500"> (likely more pages available)</span>
-                            )}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Page {currentPage}
-                            {totalPages > currentPage && ` of ${totalPages}+`}
+                          <div className="flex items-center space-x-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={goToPreviousPage}
+                              disabled={currentPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-sm text-gray-500">Page {currentPage}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={goToNextPage}
+                              disabled={!accountsData?.pagination?.hasNextPage}
+                            >
+                              Next
+                            </Button>
                           </div>
                         </div>
 
-                        {/* Accounts Grid */}
-                        <div className="grid gap-4">
-                          {currentAccounts.map((account: InactiveAccount) => (
-                          <div
-                            key={account.id}
-                            className={`border rounded-lg p-4 hover:bg-gray-50 ${
-                              processedAccounts.has(account.id) 
-                                ? 'border-green-300 bg-green-50' 
-                                : 'border-gray-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                                    <FaFacebookF className="text-gray-600 text-sm" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2">
-                                      <h3 className="font-medium text-gray-900">{account.name}</h3>
-                                      {processedAccounts.has(account.id) && (
-                                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                      )}
+                        {/* Accounts Table */}
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                          <div className="grid grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200 font-medium text-sm text-gray-700">
+                            <div>Account Name</div>
+                            <div>Account ID</div>
+                            <div>Currency</div>
+                            <div>Total Spend</div>
+                          </div>
+                          <div className="divide-y divide-gray-200">
+                            {currentAccounts.map((account: SpendAccount) => {
+                              const spendData = accountSpends[account.id];
+                              return (
+                                <div key={account.id} className="grid grid-cols-4 gap-4 p-4 hover:bg-gray-50">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                                      <FaFacebookF className="text-gray-600 text-sm" />
                                     </div>
-                                    <p className="text-sm text-gray-500">{account.id}</p>
+                                    <div>
+                                      <p className="font-medium text-gray-900">{account.name}</p>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500 font-mono">{account.id}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-900">{account.currency}</p>
+                                  </div>
+                                  <div>
+                                    {spendData?.loading ? (
+                                      <div className="flex items-center space-x-2">
+                                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                        <span className="text-sm text-gray-500">Loading...</span>
+                                      </div>
+                                    ) : spendData?.error ? (
+                                      <span className="text-sm text-red-600">Error loading</span>
+                                    ) : (
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {formatCurrency(spendData?.spend || 0, account.currency)}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
-                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-gray-500">Currency:</span>
-                                    <div className="font-medium">{account.currency}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Last Month Spend:</span>
-                                    <div className="font-medium text-blue-600">
-                                      {accountSpends[account.id]?.loading ? (
-                                        <div className="flex items-center space-x-2">
-                                          <Loader2 className="h-4 w-4 animate-spin" />
-                                          <span>Loading...</span>
-                                        </div>
-                                      ) : accountSpends[account.id]?.error ? (
-                                        <span className="text-red-500 text-xs">Unable to load</span>
-                                      ) : (
-                                        formatCurrency(accountSpends[account.id]?.spend || 0, account.currency)
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Spend Cap:</span>
-                                    <div className="font-medium text-green-600">
-                                      {formatSpendCap(account.spend_cap, account.currency)}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Status:</span>
-                                    <div className="font-medium">
-                                      <Badge 
-                                        variant={account.account_status === 'ACTIVE' ? 'default' : 'secondary'}
-                                        className="text-xs"
-                                      >
-                                        {account.account_status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="ml-4">
-                                <Button
-                                  onClick={() => handleResetSpendCap(account.id)}
-                                  disabled={processingAccountId === account.id || processedAccounts.has(account.id)}
-                                  variant="outline"
-                                  className={`${
-                                    processedAccounts.has(account.id)
-                                      ? 'border-green-600 text-green-600 bg-green-100'
-                                      : 'border-green-300 text-green-600 hover:bg-green-50'
-                                  }`}
-                                >
-                                  {processingAccountId === account.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : processedAccounts.has(account.id) ? (
-                                    <>
-                                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                                      Set to {formatCurrencyForSetCap(account.currency)}
-                                    </>
-                                  ) : (
-                                    `Set to ${formatCurrencyForSetCap(account.currency)}`
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
+                              );
+                            })}
                           </div>
-                          ))}
-                        </div>
-
-                        {/* Pagination Controls */}
-                        <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
-                          <Button
-                            onClick={goToPreviousPage}
-                            disabled={currentPage === 1 || isLoading}
-                            variant="outline"
-                            size="sm"
-                          >
-                            {isLoading ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                Loading...
-                              </>
-                            ) : (
-                              'Previous'
-                            )}
-                          </Button>
-                          
-                          <div className="flex items-center space-x-2 px-4">
-                            <span className="text-sm text-gray-700">Page {currentPage}</span>
-                          </div>
-                          
-                          <Button
-                            onClick={goToNextPage}
-                            disabled={currentAccounts.length < accountsPerPage || isLoading}
-                            variant="outline"
-                            size="sm"
-                          >
-                            {isLoading ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                Loading...
-                              </>
-                            ) : (
-                              'Next'
-                            )}
-                          </Button>
                         </div>
                       </>
                     )}

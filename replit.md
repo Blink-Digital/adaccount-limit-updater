@@ -4,7 +4,7 @@
 
 This is a full-stack web application built for managing Facebook ad accounts, specifically for viewing and updating spending caps. The application features a React frontend with shadcn/ui components and an Express.js backend that interfaces with the Facebook Graph API.
 
-**Current Status**: Ultra-fast interface optimized for speed and reliability. Users can quickly view all active ad accounts and reset spend caps as needed. No complex filtering - maximum performance.
+**Current Status**: Ultra-fast interface optimized for speed and reliability. Users can quickly view all active ad accounts and reset spend caps as needed. No complex filtering - maximum performance. New Ad Account Spend tab added for comprehensive spend reporting across date ranges.
 
 ## User Preferences
 
@@ -112,6 +112,9 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Recent Changes
 
+- **August 25, 2025**: **NEW AD ACCOUNT SPEND TAB**: Added dedicated page for spend reporting with date range selection (today, yesterday, last 7 days, last 30 days, this month, last month, this quarter, lifetime)
+- **August 25, 2025**: **ENHANCED NAVIGATION**: Updated all page headers to include links to the new Account Spend tab
+- **August 25, 2025**: **DATE RANGE FUNCTIONALITY**: Implemented progressive loading for spend data with customizable date presets using Facebook Graph API insights
 - **August 11, 2025**: **SPEND REFRESH FIX**: Prevent unnecessary spend data refresh for all accounts when updating single spend_cap - only refresh on new account IDs
 - **August 11, 2025**: **UI STATE UPDATE**: Implemented Option 3 - update local state from API response for instant spend cap refresh
 - **August 11, 2025**: **CURRENCY CONVERSION FIX**: Fixed spend_cap display showing $100 instead of $1 - Facebook returns cents, we convert to dollars
