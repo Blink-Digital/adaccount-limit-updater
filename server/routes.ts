@@ -329,6 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { accessToken, businessId, limit = 10, after, before, includeSpend = false, search } = businessManagerAccountsRequestSchema.parse(req.body);
       
+      console.log(`[BM-ACCOUNTS] Business Manager ID: ${businessId}`);
       console.log(`[BM-ACCOUNTS] ${after ? `Using cursor pagination with after: ${after.substring(0, 20)}...` : 'Fetching first page (no cursor)'}`);
       if (includeSpend) {
         console.log(`[BM-ACCOUNTS] Including last month spend data`);
@@ -360,9 +361,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[BM-ACCOUNTS] Retrieved ${data.data?.length || 0} active accounts from Facebook API`);
       console.log(`[BM-ACCOUNTS] Facebook paging info:`, JSON.stringify(data.paging || {}));
       
-      // Debug: Log first few account names for search debugging
-      if (search && data.data?.length > 0) {
-        console.log(`[BM-ACCOUNTS-DEBUG] First 5 account names:`, data.data.slice(0, 5).map((acc: any) => `"${acc.name}"`));
+      // Debug: Log account names for debugging
+      if (data.data?.length > 0) {
+        console.log(`[BM-ACCOUNTS-DEBUG] All ${data.data.length} account names:`, data.data.map((acc: any) => `"${acc.name}" (ID: ${acc.id})`));
       }
       
       let accounts: InactiveAccount[] = (data.data || []).map((account: any) => ({
