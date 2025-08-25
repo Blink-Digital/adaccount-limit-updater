@@ -38,7 +38,7 @@ import {
   AlertTriangle,
   Loader2,
   BarChart3,
-  Calendar,
+  Calendar as CalendarIcon,
   Eye,
   EyeOff,
   TrendingUp,
@@ -47,6 +47,9 @@ import {
 } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa";
 import { FacebookLoginButton } from "../components/FacebookLoginButton";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Calendar } from "../components/ui/calendar";
+import { format } from "date-fns";
 import { Link } from "wouter";
 
 interface SpendAccount {
@@ -72,7 +75,8 @@ const DATE_PRESETS = [
   { value: 'this_month', label: 'This month' },
   { value: 'last_month', label: 'Last month' },
   { value: 'this_quarter', label: 'This quarter' },
-  { value: 'maximum', label: 'All time' }
+  { value: 'maximum', label: 'All time' },
+  { value: 'custom', label: 'Custom Date Range' }
 ];
 
 export default function AdAccountSpend() {
@@ -81,6 +85,10 @@ export default function AdAccountSpend() {
   const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
   const [selectedDatePreset, setSelectedDatePreset] = useState<string>("last_30d");
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [previousCursor, setPreviousCursor] = useState<string | null>(null);
@@ -130,11 +138,20 @@ export default function AdAccountSpend() {
         [accountId]: { spend: 0, loading: true, error: null }
       }));
 
-      const response = await apiRequest("POST", "/api/facebook/account-spend", {
+      // Build request payload
+      let requestPayload: any = {
         accessToken,
         accountId,
         datePreset
-      });
+      };
+
+      // Add custom date range if preset is "custom"
+      if (datePreset === 'custom' && customStartDate && customEndDate) {
+        requestPayload.customStartDate = format(customStartDate, 'yyyy-MM-dd');
+        requestPayload.customEndDate = format(customEndDate, 'yyyy-MM-dd');
+      }
+
+      const response = await apiRequest("POST", "/api/facebook/account-spend", requestPayload);
       
       const data = await response.json();
       
@@ -487,6 +504,88 @@ export default function AdAccountSpend() {
                       Choose the time period for spend reporting
                     </p>
                   </div>
+
+                  {/* Custom Date Range Pickers */}
+                  {selectedDatePreset === 'custom' && (
+                    <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+                      <div className="flex flex-col space-y-2">
+                        <Label>Custom Date Range</Label>
+                        <div className="flex space-x-2">
+                          {/* Start Date Picker */}
+                          <div className="flex-1">
+                            <Label className="text-sm text-gray-600">Start Date</Label>
+                            <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {customStartDate ? format(customStartDate, "PPP") : "Pick start date"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={customStartDate}
+                                  onSelect={(date) => {
+                                    setCustomStartDate(date);
+                                    setStartDateOpen(false);
+                                  }}
+                                  disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* End Date Picker */}
+                          <div className="flex-1">
+                            <Label className="text-sm text-gray-600">End Date</Label>
+                            <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {customEndDate ? format(customEndDate, "PPP") : "Pick end date"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={customEndDate}
+                                  onSelect={(date) => {
+                                    setCustomEndDate(date);
+                                    setEndDateOpen(false);
+                                  }}
+                                  disabled={(date) => 
+                                    date > new Date() || 
+                                    date < new Date("1900-01-01") ||
+                                    (customStartDate && date < customStartDate)
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+
+                        {customStartDate && customEndDate && (
+                          <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                            ✓ Selected range: {format(customStartDate, "MMM d, yyyy")} - {format(customEndDate, "MMM d, yyyy")}
+                          </div>
+                        )}
+
+                        {selectedDatePreset === 'custom' && (!customStartDate || !customEndDate) && (
+                          <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                            ⚠️ Please select both start and end dates for custom range
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <Button 
                     type="submit" 

@@ -528,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fetch individual ad account spend data
   app.post("/api/facebook/account-spend", async (req, res) => {
     try {
-      const { accessToken, accountId, datePreset = "last_month" } = req.body;
+      const { accessToken, accountId, datePreset = "last_month", customStartDate, customEndDate } = req.body;
 
       if (!accessToken || !accountId) {
         return res.status(400).json({
@@ -542,7 +542,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? accountId
         : `act_${accountId}`;
 
-      const url = `https://graph.facebook.com/v21.0/${formattedAccountId}/insights?fields=spend&date_preset=${datePreset}&access_token=${accessToken}`;
+      let url;
+      if (datePreset === 'custom' && customStartDate && customEndDate) {
+        // Use time_range for custom dates
+        const timeRange = JSON.stringify({
+          since: customStartDate,
+          until: customEndDate
+        });
+        url = `https://graph.facebook.com/v21.0/${formattedAccountId}/insights?fields=spend&time_range=${encodeURIComponent(timeRange)}&access_token=${accessToken}`;
+        console.log(`[ACCOUNT-SPEND] Using custom date range: ${customStartDate} to ${customEndDate}`);
+      } else {
+        // Use date_preset for standard presets
+        url = `https://graph.facebook.com/v21.0/${formattedAccountId}/insights?fields=spend&date_preset=${datePreset}&access_token=${accessToken}`;
+        console.log(`[ACCOUNT-SPEND] Using date preset: ${datePreset}`);
+      }
 
       const response = await fetch(url);
       const data = await response.json();
