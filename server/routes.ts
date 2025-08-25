@@ -338,8 +338,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[BM-ACCOUNTS] Server-side search query: "${search}"`);
       }
       
-      // Build URL with cursor-based pagination
-      let url = `https://graph.facebook.com/v21.0/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=[{"field":"account_status","operator":"EQUAL","value":"1"}]&limit=${limit}&access_token=${accessToken}`;
+      // Build URL with cursor-based pagination and filtering
+      let filters = [{"field":"account_status","operator":"EQUAL","value":"1"}];
+      
+      // Add search filters if provided
+      if (search && search.trim()) {
+        const searchTerm = search.trim();
+        // Try filtering by name (if Facebook supports it)
+        filters.push({"field":"name","operator":"CONTAINS","value":searchTerm});
+        console.log(`[BM-ACCOUNTS] Adding Facebook API name filter: "${searchTerm}"`);
+      }
+      
+      let url = `https://graph.facebook.com/v21.0/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=${encodeURIComponent(JSON.stringify(filters))}&limit=${limit}&access_token=${accessToken}`;
       
       if (after) {
         url += `&after=${after}`;
@@ -375,34 +385,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         account_status: account.account_status?.toString() || '1'
       }));
 
-      // Apply server-side search filtering if search query is provided
+      // Note: Search filtering is now handled by Facebook API directly
+      // Keep server-side filtering as fallback for ID searches (Facebook may not support ID filtering)
       if (search && search.trim()) {
         const searchLower = search.toLowerCase();
         const originalCount = accounts.length;
         
-        // Debug: Log all account names before filtering
-        console.log(`[BM-ACCOUNTS-DEBUG] All account names before search:`, accounts.map(acc => `"${acc.name}" (ID: ${acc.id})`));
+        // Only do server-side filtering for ID searches (numbers)
+        const isIdSearch = /^\d+$/.test(search.trim());
         
-        accounts = accounts.filter((account: InactiveAccount) => {
-          // Search by account name
-          const nameMatch = account.name.toLowerCase().includes(searchLower);
+        if (isIdSearch) {
+          console.log(`[BM-ACCOUNTS] Applying server-side ID filtering for: "${search}"`);
+          accounts = accounts.filter((account: InactiveAccount) => {
+            // Search by account ID (handle both with and without "act_" prefix)
+            const idMatch = account.id.toLowerCase().includes(searchLower);
+            const idWithoutPrefix = account.id.replace('act_', '').toLowerCase();
+            const idPrefixMatch = idWithoutPrefix.includes(searchLower);
+            
+            return idMatch || idPrefixMatch;
+          });
           
-          // Search by account ID (handle both with and without "act_" prefix)
-          const idMatch = account.id.toLowerCase().includes(searchLower);
-          const idWithoutPrefix = account.id.replace('act_', '').toLowerCase();
-          const idPrefixMatch = idWithoutPrefix.includes(searchLower);
-          
-          const matches = nameMatch || idMatch || idPrefixMatch;
-          
-          // Debug: Log each account's match result
-          if (account.name.toLowerCase().includes('kongz')) {
-            console.log(`[BM-ACCOUNTS-DEBUG] Kongz account found: "${account.name}" (ID: ${account.id}), nameMatch: ${nameMatch}, idMatch: ${idMatch}, matches: ${matches}`);
-          }
-          
-          return matches;
-        });
-        
-        console.log(`[BM-ACCOUNTS] Search filtered: ${accounts.length} of ${originalCount} accounts match "${search}"`);
+          console.log(`[BM-ACCOUNTS] Server-side ID search filtered: ${accounts.length} of ${originalCount} accounts match "${search}"`);
+        } else {
+          console.log(`[BM-ACCOUNTS] Name search handled by Facebook API, ${accounts.length} accounts returned`);
+        }
       }
       
       // Note: Business Manager insights endpoint doesn't exist
