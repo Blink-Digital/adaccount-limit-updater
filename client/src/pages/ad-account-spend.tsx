@@ -41,7 +41,9 @@ import {
   Calendar,
   Eye,
   EyeOff,
-  TrendingUp
+  TrendingUp,
+  Search,
+  X
 } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa";
 import { FacebookLoginButton } from "../components/FacebookLoginButton";
@@ -82,6 +84,7 @@ export default function AdAccountSpend() {
   const [currentPage, setCurrentPage] = useState(1);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [previousCursor, setPreviousCursor] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const accountsPerPage = 20;
   const { toast } = useToast();
 
@@ -286,11 +289,31 @@ export default function AdAccountSpend() {
     }).format(amount); // Facebook Insights API returns amounts in dollars
   };
 
+  // Filter accounts based on search query
+  const filterAccounts = (accounts: SpendAccount[], query: string) => {
+    if (!query.trim()) return accounts;
+    
+    const searchLower = query.toLowerCase();
+    return accounts.filter((account: SpendAccount) => {
+      // Search by account name
+      const nameMatch = account.name.toLowerCase().includes(searchLower);
+      
+      // Search by account ID (handle both with and without "act_" prefix)
+      const idMatch = account.id.toLowerCase().includes(searchLower);
+      const idWithoutPrefix = account.id.replace('act_', '').toLowerCase();
+      const idPrefixMatch = idWithoutPrefix.includes(searchLower);
+      
+      return nameMatch || idMatch || idPrefixMatch;
+    });
+  };
+
   // Get pagination info from API response
   const pagination = spendAccounts?.pagination;
   const totalAccounts = pagination?.totalItems || 0;
   const totalPages = pagination?.totalPages || 0;
-  const currentAccounts = spendAccounts?.data || [];
+  const allCurrentAccounts = spendAccounts?.data || [];
+  const filteredAccounts = filterAccounts(allCurrentAccounts, searchQuery);
+  const currentAccounts = filteredAccounts;
 
   const goToNextPage = () => {
     const hasNextPageData = accountsData?.pagination?.hasNextPage;
@@ -518,29 +541,68 @@ export default function AdAccountSpend() {
                       </div>
                     ) : (
                       <>
-                        {/* Pagination Header */}
-                        <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-                          <div className="text-sm text-gray-700">
-                            Showing {currentAccounts.length} accounts on page {currentPage}
-                          </div>
+                        {/* Search and Pagination Header */}
+                        <div className="space-y-4 border-b border-gray-200 pb-4">
+                          {/* Search Bar */}
                           <div className="flex items-center space-x-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={goToPreviousPage}
-                              disabled={currentPage === 1}
-                            >
-                              Previous
-                            </Button>
-                            <span className="text-sm text-gray-500">Page {currentPage}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={goToNextPage}
-                              disabled={!accountsData?.pagination?.hasNextPage}
-                            >
-                              Next
-                            </Button>
+                            <div className="flex-1">
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Input
+                                  type="text"
+                                  placeholder="Search by account name or ID..."
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  className="pl-10 pr-10"
+                                />
+                                {searchQuery && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                                    onClick={() => setSearchQuery("")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            {searchQuery && (
+                              <div className="text-sm text-gray-600">
+                                {filteredAccounts.length} of {allCurrentAccounts.length} accounts
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Pagination Info */}
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-700">
+                              {searchQuery ? (
+                                `Showing ${currentAccounts.length} filtered accounts`
+                              ) : (
+                                `Showing ${currentAccounts.length} accounts on page ${currentPage}`
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={goToPreviousPage}
+                                disabled={currentPage === 1}
+                              >
+                                Previous
+                              </Button>
+                              <span className="text-sm text-gray-500">Page {currentPage}</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={goToNextPage}
+                                disabled={!accountsData?.pagination?.hasNextPage}
+                              >
+                                Next
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
