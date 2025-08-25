@@ -391,16 +391,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { field: "account_status", operator: "EQUAL", value: "1" },
       ];
 
-      // Add search filters if provided
+      // Add search filters if provided (only for name searches, not ID searches)
       if (search && search.trim()) {
         const searchTerm = search.trim();
-        // Facebook API search is case-sensitive, so try with proper capitalization
-        const capitalizedSearchTerm = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase();
+        const isIdSearch = /^\d+$/.test(searchTerm);
         
-        filters.push({ field: "name", operator: "CONTAIN", value: capitalizedSearchTerm });
-        console.log(
-          `[BM-ACCOUNTS] Adding Facebook API name filter: "${capitalizedSearchTerm}" (original: "${searchTerm}")`,
-        );
+        if (!isIdSearch) {
+          // For name searches, use Facebook API filtering
+          const capitalizedSearchTerm = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase();
+          filters.push({ field: "name", operator: "CONTAIN", value: capitalizedSearchTerm });
+          console.log(
+            `[BM-ACCOUNTS] Adding Facebook API name filter: "${capitalizedSearchTerm}" (original: "${searchTerm}")`,
+          );
+        } else {
+          // For ID searches, we'll filter server-side after getting all results
+          console.log(
+            `[BM-ACCOUNTS] ID search detected for: "${searchTerm}" - will filter server-side`,
+          );
+        }
       }
 
       let url = `https://graph.facebook.com/v21.0/${businessId}/owned_ad_accounts?fields=id,name,spend_cap,currency,account_status&filtering=${encodeURIComponent(JSON.stringify(filters))}&limit=${limit}&access_token=${accessToken}`;
@@ -448,7 +456,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: account.name,
           spend_cap: account.spend_cap,
           last_month_spend: 0, // Default value
-          currency: account.currency || "USD",
           account_status: account.account_status?.toString() || "1",
         }),
       );
