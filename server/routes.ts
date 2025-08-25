@@ -360,6 +360,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[BM-ACCOUNTS] Retrieved ${data.data?.length || 0} active accounts from Facebook API`);
       console.log(`[BM-ACCOUNTS] Facebook paging info:`, JSON.stringify(data.paging || {}));
       
+      // Debug: Log first few account names for search debugging
+      if (search && data.data?.length > 0) {
+        console.log(`[BM-ACCOUNTS-DEBUG] First 5 account names:`, data.data.slice(0, 5).map((acc: any) => `"${acc.name}"`));
+      }
+      
       let accounts: InactiveAccount[] = (data.data || []).map((account: any) => ({
         id: account.id,
         name: account.name,
