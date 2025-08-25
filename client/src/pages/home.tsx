@@ -239,6 +239,7 @@ export default function Home() {
             <nav className="flex items-center space-x-4">
               <Link href="/" className="text-blue-600 font-medium">Manage Caps</Link>
               <Link href="/reset-spend-cap" className="text-gray-600 hover:text-blue-600">Reset Caps</Link>
+              <Link href="/ad-account-spend" className="text-gray-600 hover:text-blue-600">Account Spend</Link>
             </nav>
           </div>
         </div>

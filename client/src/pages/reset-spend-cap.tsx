@@ -398,6 +398,7 @@ export default function ResetSpendCap() {
             <nav className="flex items-center space-x-4">
               <Link href="/" className="text-gray-600 hover:text-blue-600">Manage Caps</Link>
               <Link href="/reset-spend-cap" className="text-red-600 font-medium">Reset Caps</Link>
+              <Link href="/ad-account-spend" className="text-gray-600 hover:text-blue-600">Account Spend</Link>
             </nav>
           </div>
         </div>

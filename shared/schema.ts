@@ -40,7 +40,8 @@ export const businessManagerAccountsRequestSchema = z.object({
   limit: z.number().min(1).max(100).default(20),
   after: z.string().optional(), // Facebook cursor for next page
   before: z.string().optional(), // Facebook cursor for previous page
-  includeSpend: z.boolean().default(false) // Whether to include spend data
+  includeSpend: z.boolean().default(false), // Whether to include spend data
+  search: z.string().optional() // Search query for account name or ID
 });
 
 export const businessManagerSchema = z.object({
