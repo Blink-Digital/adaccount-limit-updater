@@ -65,12 +65,12 @@ interface AccountSpendState {
 const DATE_PRESETS = [
   { value: 'today', label: 'Today' },
   { value: 'yesterday', label: 'Yesterday' },
-  { value: 'last_7_days', label: 'Last 7 days' },
-  { value: 'last_30_days', label: 'Last 30 days' },
+  { value: 'last_7d', label: 'Last 7 days' },
+  { value: 'last_30d', label: 'Last 30 days' },
   { value: 'this_month', label: 'This month' },
   { value: 'last_month', label: 'Last month' },
   { value: 'this_quarter', label: 'This quarter' },
-  { value: 'lifetime', label: 'Lifetime' }
+  { value: 'maximum', label: 'All time' }
 ];
 
 export default function AdAccountSpend() {
@@ -78,7 +78,7 @@ export default function AdAccountSpend() {
   const [accessToken, setAccessToken] = useState("");
   const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
-  const [selectedDatePreset, setSelectedDatePreset] = useState<string>("last_30_days");
+  const [selectedDatePreset, setSelectedDatePreset] = useState<string>("last_30d");
   const [currentPage, setCurrentPage] = useState(1);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [previousCursor, setPreviousCursor] = useState<string | null>(null);
