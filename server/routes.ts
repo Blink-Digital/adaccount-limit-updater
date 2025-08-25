@@ -391,22 +391,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { field: "account_status", operator: "EQUAL", value: "1" },
       ];
 
-      // Add search filters if provided (only for name searches, not ID searches)
+      // Add search filters if provided
       if (search && search.trim()) {
         const searchTerm = search.trim();
         const isIdSearch = /^\d+$/.test(searchTerm);
         
-        if (!isIdSearch) {
+        if (isIdSearch) {
+          // For ID searches, use Facebook API filtering with account ID
+          // Try both with and without "act_" prefix
+          const idWithPrefix = searchTerm.startsWith('act_') ? searchTerm : `act_${searchTerm}`;
+          filters.push({ field: "id", operator: "CONTAIN", value: idWithPrefix });
+          console.log(
+            `[BM-ACCOUNTS] Adding Facebook API ID filter: "${idWithPrefix}" (original: "${searchTerm}")`,
+          );
+        } else {
           // For name searches, use Facebook API filtering
           const capitalizedSearchTerm = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase();
           filters.push({ field: "name", operator: "CONTAIN", value: capitalizedSearchTerm });
           console.log(
             `[BM-ACCOUNTS] Adding Facebook API name filter: "${capitalizedSearchTerm}" (original: "${searchTerm}")`,
-          );
-        } else {
-          // For ID searches, we'll filter server-side after getting all results
-          console.log(
-            `[BM-ACCOUNTS] ID search detected for: "${searchTerm}" - will filter server-side`,
           );
         }
       }
@@ -460,39 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       );
 
-      // Note: Search filtering is now handled by Facebook API directly
-      // Keep server-side filtering as fallback for ID searches (Facebook may not support ID filtering)
-      if (search && search.trim()) {
-        const searchLower = search.toLowerCase();
-        const originalCount = accounts.length;
-
-        // Only do server-side filtering for ID searches (numbers)
-        const isIdSearch = /^\d+$/.test(search.trim());
-
-        if (isIdSearch) {
-          console.log(
-            `[BM-ACCOUNTS] Applying server-side ID filtering for: "${search}"`,
-          );
-          accounts = accounts.filter((account: InactiveAccount) => {
-            // Search by account ID (handle both with and without "act_" prefix)
-            const idMatch = account.id.toLowerCase().includes(searchLower);
-            const idWithoutPrefix = account.id
-              .replace("act_", "")
-              .toLowerCase();
-            const idPrefixMatch = idWithoutPrefix.includes(searchLower);
-
-            return idMatch || idPrefixMatch;
-          });
-
-          console.log(
-            `[BM-ACCOUNTS] Server-side ID search filtered: ${accounts.length} of ${originalCount} accounts match "${search}"`,
-          );
-        } else {
-          console.log(
-            `[BM-ACCOUNTS] Name search handled by Facebook API, ${accounts.length} accounts returned`,
-          );
-        }
-      }
+      // Note: All search filtering is now handled by Facebook API directly
 
       // Note: Business Manager insights endpoint doesn't exist
       // Individual account spend data will be fetched from frontend
