@@ -379,6 +379,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const searchLower = search.toLowerCase();
         const originalCount = accounts.length;
         
+        // Debug: Log all account names before filtering
+        console.log(`[BM-ACCOUNTS-DEBUG] All account names before search:`, accounts.map(acc => `"${acc.name}" (ID: ${acc.id})`));
+        
         accounts = accounts.filter((account: InactiveAccount) => {
           // Search by account name
           const nameMatch = account.name.toLowerCase().includes(searchLower);
@@ -388,7 +391,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const idWithoutPrefix = account.id.replace('act_', '').toLowerCase();
           const idPrefixMatch = idWithoutPrefix.includes(searchLower);
           
-          return nameMatch || idMatch || idPrefixMatch;
+          const matches = nameMatch || idMatch || idPrefixMatch;
+          
+          // Debug: Log each account's match result
+          if (account.name.toLowerCase().includes('kongz')) {
+            console.log(`[BM-ACCOUNTS-DEBUG] Kongz account found: "${account.name}" (ID: ${account.id}), nameMatch: ${nameMatch}, idMatch: ${idMatch}, matches: ${matches}`);
+          }
+          
+          return matches;
         });
         
         console.log(`[BM-ACCOUNTS] Search filtered: ${accounts.length} of ${originalCount} accounts match "${search}"`);
