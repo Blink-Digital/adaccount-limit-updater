@@ -527,28 +527,10 @@ export default function AdAccountSpend() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {isLoading && (
-                  <div className="text-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-                    <p className="text-sm text-gray-600 mt-2">Loading ad accounts...</p>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-start space-x-3">
-                      <AlertTriangle className="h-5 w-5 text-red-600 mt-1" />
-                      <div>
-                        <h3 className="text-sm font-medium text-red-800">Error</h3>
-                        <p className="text-sm text-red-700 mt-1">{typeof error === 'string' ? error : 'An error occurred'}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {spendAccounts?.success && spendAccounts.data && (
+                {/* Search Bar - Always Visible when we have data or are loading */}
+                {(spendAccounts?.success || isLoading) && (
                   <div className="space-y-4">
-                    {/* Search Bar - Always Visible */}
+                    {/* Search Bar Section */}
                     <div className="space-y-4 border-b border-gray-200 pb-4">
                       {/* Search Bar */}
                       <div className="flex items-center space-x-4">
@@ -561,6 +543,7 @@ export default function AdAccountSpend() {
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               className="pl-10 pr-10"
+                              disabled={isLoading && !spendAccounts?.success}
                             />
                             {searchQuery && (
                               <Button
@@ -569,6 +552,7 @@ export default function AdAccountSpend() {
                                 size="sm"
                                 className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
                                 onClick={() => setSearchQuery("")}
+                                disabled={isLoading && !spendAccounts?.success}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
@@ -589,53 +573,78 @@ export default function AdAccountSpend() {
                         )}
                       </div>
                       
-                      {/* Pagination Info */}
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-gray-700">
-                          {searchQuery ? (
-                            `Showing ${currentAccounts.length} search results`
-                          ) : (
-                            `Showing ${currentAccounts.length} accounts on page ${currentPage}`
-                          )}
+                      {/* Pagination Info - Only show when we have data */}
+                      {spendAccounts?.success && (
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-gray-700">
+                            {searchQuery ? (
+                              `Showing ${currentAccounts.length} search results`
+                            ) : (
+                              `Showing ${currentAccounts.length} accounts on page ${currentPage}`
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={goToPreviousPage}
+                              disabled={currentPage === 1 || isSearching}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-sm text-gray-500">
+                              {searchQuery ? "Search Results" : `Page ${currentPage}`}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={goToNextPage}
+                              disabled={!accountsData?.pagination?.hasNextPage || isSearching || !!searchQuery}
+                            >
+                              Next
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={goToPreviousPage}
-                            disabled={currentPage === 1 || isSearching}
-                          >
-                            Previous
-                          </Button>
-                          <span className="text-sm text-gray-500">
-                            {searchQuery ? "Search Results" : `Page ${currentPage}`}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={goToNextPage}
-                            disabled={!accountsData?.pagination?.hasNextPage || isSearching || !!searchQuery}
-                          >
-                            Next
-                          </Button>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Results Section */}
-                    {spendAccounts.data.length === 0 ? (
+                    {/* Loading State - Below Search Bar */}
+                    {isLoading && (
                       <div className="text-center py-8">
-                        <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-gray-900">No Accounts Found</h3>
-                        <p className="text-gray-600">
-                          {searchQuery 
-                            ? `No accounts match your search "${searchQuery}". Try a different search term or clear the search to see all accounts.`
-                            : "No ad accounts found in this Business Manager."
-                          }
-                        </p>
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+                        <p className="text-sm text-gray-600 mt-2">Loading ad accounts...</p>
                       </div>
-                    ) : (
+                    )}
+
+                    {/* Error State - Below Search Bar */}
+                    {error && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start space-x-3">
+                          <AlertTriangle className="h-5 w-5 text-red-600 mt-1" />
+                          <div>
+                            <h3 className="text-sm font-medium text-red-800">Error</h3>
+                            <p className="text-sm text-red-700 mt-1">{typeof error === 'string' ? error : 'An error occurred'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Results Section - Below Search Bar */}
+                    {spendAccounts?.success && spendAccounts.data && (
                       <>
+                        {spendAccounts.data.length === 0 ? (
+                          <div className="text-center py-8">
+                            <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                            <h3 className="text-lg font-medium text-gray-900">No Accounts Found</h3>
+                            <p className="text-gray-600">
+                              {searchQuery 
+                                ? `No accounts match your search "${searchQuery}". Try a different search term or clear the search to see all accounts.`
+                                : "No ad accounts found in this Business Manager."
+                              }
+                            </p>
+                          </div>
+                        ) : (
+                          <>
 
                         {/* Accounts Table */}
                         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -683,8 +692,17 @@ export default function AdAccountSpend() {
                             })}
                           </div>
                         </div>
+                          </>
+                        )}
                       </>
                     )}
+                  </div>
+                )}
+
+                {/* Show message when no access token or no loading/data state */}
+                {!accessToken && !isLoading && !spendAccounts && (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Enter your access token and load account data to get started</p>
                   </div>
                 )}
               </CardContent>
