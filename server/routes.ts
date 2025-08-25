@@ -327,11 +327,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Business Manager accounts with pagination and optional spend data
   app.post("/api/facebook/business-manager-accounts", async (req, res) => {
     try {
-      const { accessToken, businessId, limit = 10, after, before, includeSpend = false } = businessManagerAccountsRequestSchema.parse(req.body);
+      const { accessToken, businessId, limit = 10, after, before, includeSpend = false, search } = businessManagerAccountsRequestSchema.parse(req.body);
       
       console.log(`[BM-ACCOUNTS] ${after ? `Using cursor pagination with after: ${after.substring(0, 20)}...` : 'Fetching first page (no cursor)'}`);
       if (includeSpend) {
         console.log(`[BM-ACCOUNTS] Including last month spend data`);
+      }
+      if (search) {
+        console.log(`[BM-ACCOUNTS] Server-side search query: "${search}"`);
       }
       
       // Build URL with cursor-based pagination
@@ -365,6 +368,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency: account.currency || 'USD',
         account_status: account.account_status?.toString() || '1'
       }));
+
+      // Apply server-side search filtering if search query is provided
+      if (search && search.trim()) {
+        const searchLower = search.toLowerCase();
+        const originalCount = accounts.length;
+        
+        accounts = accounts.filter((account: InactiveAccount) => {
+          // Search by account name
+          const nameMatch = account.name.toLowerCase().includes(searchLower);
+          
+          // Search by account ID (handle both with and without "act_" prefix)
+          const idMatch = account.id.toLowerCase().includes(searchLower);
+          const idWithoutPrefix = account.id.replace('act_', '').toLowerCase();
+          const idPrefixMatch = idWithoutPrefix.includes(searchLower);
+          
+          return nameMatch || idMatch || idPrefixMatch;
+        });
+        
+        console.log(`[BM-ACCOUNTS] Search filtered: ${accounts.length} of ${originalCount} accounts match "${search}"`);
+      }
       
       // Note: Business Manager insights endpoint doesn't exist
       // Individual account spend data will be fetched from frontend

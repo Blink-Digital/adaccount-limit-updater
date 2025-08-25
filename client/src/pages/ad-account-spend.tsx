@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -201,12 +201,17 @@ export default function AdAccountSpend() {
     }
   }, [selectedDatePreset]);
 
-  // Manual fetch function
-  const fetchAccountsManually = async (cursor?: string | null) => {
+  // Manual fetch function with search support
+  const fetchAccountsManually = async (cursor?: string | null, searchTerm?: string) => {
     if (!accessToken || !selectedBusinessId) return;
     
     setIsManualLoading(true);
     setManualError(null);
+    
+    // Show search loading state if searching
+    if (searchTerm !== undefined) {
+      setIsSearching(true);
+    }
     
     try {
       const requestBody: any = { 
@@ -216,6 +221,12 @@ export default function AdAccountSpend() {
         limit: accountsPerPage,
         includeSpend: false // Don't need Business Manager insights for this page
       };
+      
+      // Add search parameter if provided
+      if (searchTerm !== undefined && searchTerm.trim()) {
+        requestBody.search = searchTerm.trim();
+        console.log(`[MANUAL-FETCH] Server-side search: "${searchTerm}"`);
+      }
       
       if (cursor) {
         requestBody.after = cursor;
@@ -236,6 +247,7 @@ export default function AdAccountSpend() {
       console.error('[MANUAL-FETCH] Error:', error);
     } finally {
       setIsManualLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -247,6 +259,18 @@ export default function AdAccountSpend() {
       fetchAccountsManually();
     }
   }, [accessToken, selectedBusinessId]);
+
+  // Trigger search when debounced search query changes
+  useEffect(() => {
+    if (accessToken && selectedBusinessId) {
+      // Reset pagination when searching
+      setCurrentPage(1);
+      setNextCursor(null);
+      setPreviousCursor(null);
+      
+      fetchAccountsManually(null, debouncedSearchQuery);
+    }
+  }, [debouncedSearchQuery, accessToken, selectedBusinessId]);
 
   // Expose data in the expected format
   const spendAccounts = accountsData;
@@ -289,31 +313,26 @@ export default function AdAccountSpend() {
     }).format(amount); // Facebook Insights API returns amounts in dollars
   };
 
-  // Filter accounts based on search query
-  const filterAccounts = (accounts: SpendAccount[], query: string) => {
-    if (!query.trim()) return accounts;
-    
-    const searchLower = query.toLowerCase();
-    return accounts.filter((account: SpendAccount) => {
-      // Search by account name
-      const nameMatch = account.name.toLowerCase().includes(searchLower);
-      
-      // Search by account ID (handle both with and without "act_" prefix)
-      const idMatch = account.id.toLowerCase().includes(searchLower);
-      const idWithoutPrefix = account.id.replace('act_', '').toLowerCase();
-      const idPrefixMatch = idWithoutPrefix.includes(searchLower);
-      
-      return nameMatch || idMatch || idPrefixMatch;
-    });
-  };
+  // Debounced search function to avoid too many API calls
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (debouncedSearchQuery !== searchQuery) {
+        setDebouncedSearchQuery(searchQuery);
+      }
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearchQuery]);
 
   // Get pagination info from API response
   const pagination = spendAccounts?.pagination;
   const totalAccounts = pagination?.totalItems || 0;
   const totalPages = pagination?.totalPages || 0;
-  const allCurrentAccounts = spendAccounts?.data || [];
-  const filteredAccounts = filterAccounts(allCurrentAccounts, searchQuery);
-  const currentAccounts = filteredAccounts;
+  const currentAccounts = spendAccounts?.data || [];
 
   const goToNextPage = () => {
     const hasNextPageData = accountsData?.pagination?.hasNextPage;
@@ -568,9 +587,16 @@ export default function AdAccountSpend() {
                                 )}
                               </div>
                             </div>
-                            {searchQuery && (
+                            {(searchQuery || isSearching) && (
                               <div className="text-sm text-gray-600">
-                                {filteredAccounts.length} of {allCurrentAccounts.length} accounts
+                                {isSearching ? (
+                                  <div className="flex items-center space-x-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Searching...</span>
+                                  </div>
+                                ) : searchQuery ? (
+                                  `Found ${currentAccounts.length} matching accounts`
+                                ) : null}
                               </div>
                             )}
                           </div>
@@ -579,7 +605,7 @@ export default function AdAccountSpend() {
                           <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-700">
                               {searchQuery ? (
-                                `Showing ${currentAccounts.length} filtered accounts`
+                                `Showing ${currentAccounts.length} search results`
                               ) : (
                                 `Showing ${currentAccounts.length} accounts on page ${currentPage}`
                               )}
@@ -589,16 +615,18 @@ export default function AdAccountSpend() {
                                 variant="outline"
                                 size="sm"
                                 onClick={goToPreviousPage}
-                                disabled={currentPage === 1}
+                                disabled={currentPage === 1 || isSearching}
                               >
                                 Previous
                               </Button>
-                              <span className="text-sm text-gray-500">Page {currentPage}</span>
+                              <span className="text-sm text-gray-500">
+                                {searchQuery ? "Search Results" : `Page ${currentPage}`}
+                              </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={goToNextPage}
-                                disabled={!accountsData?.pagination?.hasNextPage}
+                                disabled={!accountsData?.pagination?.hasNextPage || isSearching || !!searchQuery}
                               >
                                 Next
                               </Button>
