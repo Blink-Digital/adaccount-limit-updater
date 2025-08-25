@@ -180,6 +180,12 @@ export default function AdAccountSpend() {
   // Auto-load spend data for all accounts when NEW accounts are loaded or date preset changes
   useEffect(() => {
     if (accountsData?.data && accessToken && selectedDatePreset) {
+      // Skip auto-loading for custom preset if dates are not selected
+      if (selectedDatePreset === 'custom' && (!customStartDate || !customEndDate)) {
+        console.log(`[SPEND-LOADER] Custom date preset selected but dates not chosen - skipping auto-load`);
+        return;
+      }
+
       const accounts = accountsData.data;
       const currentAccountIds = accounts.map((acc: SpendAccount) => acc.id);
       
@@ -203,11 +209,17 @@ export default function AdAccountSpend() {
         console.log(`[SPEND-LOADER] Account properties updated but IDs unchanged - skipping spend refresh`);
       }
     }
-  }, [accountsData?.data, accessToken, selectedDatePreset, previousAccountIds]);
+  }, [accountsData?.data, accessToken, selectedDatePreset, previousAccountIds, customStartDate, customEndDate]);
 
   // Refresh spend data when date preset changes (for existing accounts)
   useEffect(() => {
     if (accountsData?.data && accessToken && previousAccountIds.length > 0) {
+      // Skip auto-refresh for custom preset if dates are not selected
+      if (selectedDatePreset === 'custom' && (!customStartDate || !customEndDate)) {
+        console.log(`[DATE-CHANGE] Custom date preset selected but dates not chosen - skipping auto-refresh`);
+        return;
+      }
+
       console.log(`[DATE-CHANGE] Date preset changed to ${selectedDatePreset} - refreshing spend data`);
       
       // Clear previous spend data
@@ -218,7 +230,7 @@ export default function AdAccountSpend() {
         fetchAccountSpend(account.id, selectedDatePreset);
       });
     }
-  }, [selectedDatePreset]);
+  }, [selectedDatePreset, customStartDate, customEndDate]);
 
   // Manual fetch function with search support
   const fetchAccountsManually = async (cursor?: string | null, searchTerm?: string) => {
@@ -573,8 +585,28 @@ export default function AdAccountSpend() {
                         </div>
 
                         {customStartDate && customEndDate && (
-                          <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
-                            ✓ Selected range: {format(customStartDate, "MMM d, yyyy")} - {format(customEndDate, "MMM d, yyyy")}
+                          <div className="space-y-2">
+                            <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                              ✓ Selected range: {format(customStartDate, "MMM d, yyyy")} - {format(customEndDate, "MMM d, yyyy")}
+                            </div>
+                            <Button 
+                              onClick={() => {
+                                if (accountsData?.data) {
+                                  console.log(`[CUSTOM-DATE-LOAD] Loading spend data for custom range: ${format(customStartDate, "yyyy-MM-dd")} to ${format(customEndDate, "yyyy-MM-dd")}`);
+                                  // Clear previous spend data
+                                  setAccountSpends({});
+                                  // Fetch spend for all accounts with custom dates
+                                  accountsData.data.forEach((account: SpendAccount) => {
+                                    fetchAccountSpend(account.id, 'custom');
+                                  });
+                                }
+                              }}
+                              className="w-full bg-green-600 hover:bg-green-700"
+                              size="sm"
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Load Data for Custom Range
+                            </Button>
                           </div>
                         )}
 
